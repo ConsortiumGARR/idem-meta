@@ -1,0 +1,2372 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+    Federation metadata signing process for the UK federation.
+
+    The following are among the callable targets for this process:
+
+    * "ant process.create-aggregates.test" generates the set of unsigned aggregates, and does nothing else
+    * "ant process.mergetomaster.deferred" takes the deferred branch of the data repository, and merges it to master, ready to create aggregates.
+    * "ant process.mergetomaster.immediate" takes the immediate branch of the data repository, and merges it to master, ready to create aggregates.
+    * "ant process.create-aggregates" generates the set of unsigned aggregates from the other files.
+    * "ant process.sign-aggregates.sign" signs each aggregate and verifies the signatures
+    * "ant process.collect-mdq" collects the static cache of MDQ responses
+    * "ant process.publish" sends all files to the metadata distribution servers.
+-->
+<project default="echoproperties" xmlns:if="ant:if" xmlns:unless="ant:unless">
+
+    <!--
+        *******************************
+        ***                         ***
+        ***   P R O P E R T I E S   ***
+        ***                         ***
+        *******************************
+    -->
+
+    <!--
+        When invoking the targets related to the signing process, a production deployment
+        MUST define the following properties:
+
+        * shared.ws.dir              - the full path the to the shared workspace that all this will execute under
+        * sign.uk.keyPassword        - password for the pkcs11 keystore
+
+        The following properties MUST be provided as arguments when invoking the targets that make use of them:
+
+        * jenkins.url.to.trigger.signing     - full URL to trigger the Jenkins task responsible for signing
+        * jenkins.url.to.trigger.publication - full URL to trigger the Jenkins task responsible for publication
+    -->
+
+
+    <!--
+        *******************************************
+        ***                                     ***
+        ***   P R O P E R T Y   S O U R C E S   ***
+        ***                                     ***
+        *******************************************
+    -->
+
+    <!--
+        os.family
+
+        Distinguish between the general kind of operating systems
+        we could be executing on.
+
+        Values: windows, macosx, linux, other.
+    -->
+    <condition property="os.family" value="windows">
+        <os family="windows"/>
+    </condition>
+    <condition property="os.family" value="macosx">
+        <os family="mac"/>
+    </condition>
+    <condition property="os.family" value="linux">
+        <os family="unix" name="Linux"/>
+    </condition>
+    <property name="os.family" value="other"/>
+
+    <!--
+        env
+
+        Distinguish between different classes of deployment,
+        e.g., development vs. production.
+
+        Values: dev, preprod, prod, prod-old
+
+        Defaults to "dev" here, but that can be overridden from the command
+        line, a Jenkins job, or in build.properties.
+    -->
+    <property name="env" value="dev"/>
+
+    <!--
+        External property files.
+
+        Pull in properties from external files. Because Ant properties are
+        immutable, amy properties declared in this file should be regarded as
+        defaults, and will be overridden by any definitions in the following
+        locations:
+
+        * on the command line
+        * in a Jenkins job definition
+        * in any of the external files listed below
+
+        The first location specifying a particular property sets the final value.
+
+        The build.properties file is not source controlled, and should be used
+        to override properties for a particular deployment, or to include
+        credentials.
+    -->
+    <property file="build.properties"/>
+    <property file="${os.family}.properties"/>
+    <property file="${env}.properties"/>
+    <property file="default.properties"/>
+
+    <!--
+        ***************************************************************
+        ***                                                         ***
+        ***   G I T   I N T E G R A T I O N   P R O P E R T I E S   ***
+        ***                                                         ***
+        ***************************************************************
+    -->
+
+    <property name="git.executable" value="git"/>
+
+    <!--
+        This project is integrated with two others using Git.
+
+        The following properties describe where the repositories for those projects are located.
+    -->
+    <property name="git.repo.user" value="git"/>
+    <property name="git.repo.host" value="repo.infr.ukfederation.org.uk"/>
+    <property name="git.repo.group" value="ukf"/>
+
+    <!--
+        Name each of the project repositories.
+    -->
+    <property name="git.repo.project.data" value="ukf-data"/>
+    <property name="git.repo.project.products" value="ukf-products"/>
+    <property name="git.repo.project.tooling" value="ukf-meta"/>
+
+    <!--
+        Build access URLs for each repository.
+    -->
+    <property name="git.repo.data.url" value="${git.repo.user}@${git.repo.host}:${git.repo.group}/${git.repo.project.data}"/>
+    <property name="git.repo.products.url" value="${git.repo.user}@${git.repo.host}:${git.repo.group}/${git.repo.project.products}"/>
+    <property name="git.repo.tooling.url" value="${git.repo.user}@${git.repo.host}:${git.repo.group}/${git.repo.project.tooling}"/>
+
+    <!--
+        *********************************************
+        ***                                       ***
+        ***   S E R V E R   P R O P E R T I E S   ***
+        ***                                       ***
+        *********************************************
+    -->
+
+    <!--
+        Metadata Distribution Service server properties.
+    -->
+    <property name="md.dist.host1.name" value="md1.infr.ukfederation.org.uk"/>
+    <property name="md.dist.host2.name" value="md2.infr.ukfederation.org.uk"/>
+    <property name="md.dist.host3.name" value="md3.infr.ukfederation.org.uk"/>
+
+    <!--
+        Middlebox server properties.
+    -->
+    <property name="orchestrator.user" value="jenkins"/>
+    <property name="orchestrator.hostname" value="orchestrator.infr.ukfederation.org.uk"/>
+    <property name="orchestrator.path" value="${shared.ws.dir}/build"/>
+    <property name="orchestrator.url" value="${orchestrator.user}@${orchestrator.hostname}:${orchestrator.path}"/>
+
+    <!--
+        Signing server properties.
+    -->
+    <property name="keymaster.user" value="jenkinsslave"/>
+    <property name="keymaster.hostname" value="keymaster.infr.ukfederation.org.uk"/>
+    <property name="keymaster.path" value="${shared.ws.dir}/build"/>
+    <property name="keymaster.url" value="${keymaster.user}@${keymaster.hostname}:${keymaster.path}"/>
+
+    <!--
+        Web server properties.
+    -->
+    <property name="www.user" value="wwwscp"/>
+    <property name="www.hostname" value="web1.infr.ukfederation.org.uk"/>
+    <property name="www.path" value="/var/www/html/fed"/>
+    <property name="www.url" value="${www.user}@${www.hostname}:${www.path}"/>
+
+
+     <!--
+        *******************************************************
+        ***                                                 ***
+        ***   F I L E   S Y S T E M   P R O P E R T I E S   ***
+        ***                                                 ***
+        *******************************************************
+    -->
+
+    <!--
+        Shared workspace location.
+
+        The property shared.ws.dir must be defined in order to locate the shared
+        workspace used for inputs to and outputs from the tooling. In production,
+        this location is passed through from the Jenkins job. In the dev environment,
+        it is assumed (by dev.properties) to be in this repository's parent directory.
+    -->
+    <fail unless="shared.ws.dir" message="shared.ws.dir was not defined"/>
+
+    <!--
+        There must be a build directory in the shared workspace.
+    -->
+    <fail message="shared workspace ${shared.ws.dir} doesn't contain a build directory">
+        <condition>
+            <not>
+                <available file="${shared.ws.dir}/build" type="dir"/>
+            </not>
+        </condition>
+    </fail>
+
+    <!--
+        External specialised directories.
+    -->
+    <property name="aggregates.dir" value="${shared.ws.dir}/${git.repo.project.products}/aggregates"/>
+    <property name="entities.dir" value="${shared.ws.dir}/${git.repo.project.data}/entities"/>
+    <property name="members.dir" value="${shared.ws.dir}/${git.repo.project.data}/members"/>
+    <property name="output.dir" value="${shared.ws.dir}/build"/>
+    <property name="temp.dir" value="${shared.ws.dir}/build"/>
+
+    <!--
+        Local specialised directories.
+    -->
+    <property name="build.dir" value="${basedir}/build"/>
+    <property name="mdx.dir" value="${basedir}/mdx"/>
+    <property name="rules.dir" value="${mdx.dir}/_rules"/>
+    <property name="utilities.dir" value="${basedir}/utilities"/>
+
+    <!--
+        Location of externally supplied tool bundles.
+    -->
+    <property name="tools.dir" value="tools"/>
+    <property name="tools.ant" value="${tools.dir}/ant"/>
+    <property name="tools.mda" value="${tools.dir}/aggregator-cli-0.9.1"/>
+    <property name="tools.mdnorm" value="${tools.dir}/mdnorm"/>
+    <property name="tools.metadatatool" value="${tools.dir}/metadatatool"/>
+    <property name="tools.slacktee" value="${tools.dir}/slacktee"/>
+    <property name="tools.xmlsectool" value="${tools.dir}/xmlsectool-2.0.0"/>
+    <property name="tools.xalan" value="${tools.dir}/xalan"/>
+
+    <!--
+        Full path to a commonly used temporary file.
+    -->
+    <property name="temp.xml" value="${temp.dir}/temp.xml"/>
+
+    <!--
+        Lockfile (the signing process should only be allowed to begin if this is not present)
+    -->
+    <property name="lockfile" value="${shared.ws.dir}/lockfile"/>
+
+    <!--
+        There are many separate processing "streams":  production, test, export,
+        fallback, "wayf", and "cdsall".
+
+        Each stream has its own unsigned file, as follows:
+    -->
+    <property name="mdaggr.prod.unsigned"   value="ukfederation-metadata-unsigned.xml"/>
+    <property name="mdaggr.test.unsigned"   value="ukfederation-test-unsigned.xml"/>
+    <property name="mdaggr.export.unsigned" value="ukfederation-export-unsigned.xml"/>
+    <property name="mdaggr.export.preview.unsigned"
+                                            value="ukfederation-export-preview-unsigned.xml"/>
+    <property name="mdaggr.back.unsigned"   value="ukfederation-back-unsigned.xml"/>
+    <property name="mdaggr.wayf.unsigned"   value="ukfederation-wayf-unsigned.xml"/>
+    <property name="mdaggr.cdsall.unsigned" value="ukfederation-cdsall-unsigned.xml"/>
+
+    <!--
+        Each stream also has its own signed file, as follows:
+    -->
+    <property name="mdaggr.prod.signed"     value="ukfederation-metadata.xml"/>
+    <property name="mdaggr.test.signed"     value="ukfederation-test.xml"/>
+    <property name="mdaggr.export.signed"   value="ukfederation-export.xml"/>
+    <property name="mdaggr.export.preview.signed"
+                                            value="ukfederation-export-preview.xml"/>
+    <property name="mdaggr.back.signed"     value="ukfederation-back.xml"/>
+    <property name="mdaggr.wayf.signed"     value="ukfederation-wayf.xml"/>
+    <property name="mdaggr.cdsall.signed"   value="ukfederation-cdsall.xml"/>
+
+    <!--
+        Other files
+    -->
+    <property name="mdaggr.stats" value="ukfederation-stats.html"/>
+
+
+    <!--
+        *************************************************
+        ***                                           ***
+        ***   M I S C E L L A N E O U S   S E T U P   ***
+        ***                                           ***
+        *************************************************
+    -->
+
+    <!--
+        Additional ANT task definitions.
+    -->
+    <taskdef resource="net/sf/antcontrib/antlib.xml">
+        <classpath>
+            <pathelement location="${tools.ant}/lib/ant-contrib-1.0b3.jar"/>
+        </classpath>
+    </taskdef>
+
+    <!--
+        Verification keystore.
+    -->
+    <property name="keystore.uk.vfy.alias" value="ukfederation"/>
+
+    <!--
+        Java memory requirements.
+
+        This is used as the max heap setting for all Java invocations.  This amount will
+        be more than some invocations require, but there's no harm in having a higher
+        limit for all of them.
+    -->
+    <property name="java.max.memory" value="1024m"/>
+
+
+    <!--
+        *************************************************
+        ***                                           ***
+        ***   E N T R Y   P O I N T   T A R G E T S   ***
+        ***                                           ***
+        *************************************************
+    -->
+
+    <!--
+        Stage 0 of md process: test creation of aggregates, looking for errors.
+        Uses deferred branch.
+        Assumes you've run a git.pull.all first, as this target doesn't do that.
+
+        Runs on: aggr
+
+        Process:
+            * Git: Checkout deferred branch
+            * SAML MD: Run UK Verify flow
+    -->
+    <target name="process.create-aggregates.test.deferredbranch" depends="
+        git.data.deferredbranch.checkout,
+        samlmd.aggregates.generate.dry-run">
+        <echo>Test aggregates built successfully from deferred branch.</echo>
+    </target>
+
+    <!--
+        Stage 0 of md process: test creation of aggregates, looking for errors.
+        Uses immediate branch.
+        Assumes you've run a git.pull.all first, as this target doesn't do that.
+
+        Runs on: aggr
+
+        Process:
+        * Git: Checkout immediate branch
+        * SAML MD: Run UK Verify flow
+    -->
+    <target name="process.create-aggregates.test.immediatebranch" depends="
+        git.data.immediatebranch.checkout,
+        samlmd.aggregates.generate.dry-run">
+        <echo>Test aggregates built successfully from immediate branch.</echo>
+    </target>
+
+    <!--
+        Stage 0 of md process: test creation of aggregates, looking for errors.
+        Uses master branch.
+        Assumes you've run a git.pull.all first, as this target doesn't do that.
+
+        Runs on: aggr
+
+        Process:
+        * Git: Checkout master branch
+        * SAML MD: Run UK Verify flow
+    -->
+    <target name="process.create-aggregates.test.masterbranch" depends="
+        git.data.masterbranch.checkout,
+        samlmd.aggregates.generate.dry-run">
+        <echo>Test aggregates built successfully from master branch.</echo>
+    </target>
+
+    <!--
+        Stage 1 (normal process) of md process: merge the updates into master
+
+        Runs on: aggr
+
+        Process:
+            * Lock: Check for presence of lockfile, if not present, create it
+            * API: Pause the API
+            * FS: Make sure output directory is clear
+            * Git: Make sure all repos up to date
+            * Git: Merge deferred branch into immediate branch
+            * Git: Merge immediate branch into master branch
+    -->
+    <target name="process.mergetomaster.deferred" depends="
+        lock.check,
+        lock.lock,
+        api.pause,
+        fs.clear.outputdir,
+        git.pull.all,
+        git.data.merge.deferredintoimmediate,
+        git.data.merge.immediateintomaster">
+        <echo>Stage 1 (normal) Success: Lockfile created, API paused, deferred branch merged into immediate and then into master.</echo>
+    </target>
+
+    <!--
+        Stage 1 (emergency change process) of md process: merge the updates into master
+
+        Runs on: aggr
+
+        Process:
+            * Lock: Check for presence of lockfile, if not present, create it
+            * API: Pause the API
+            * FS: Make sure output directory is clear
+            * Git: Make sure all repos up to date
+            * Git: Merge immediate tree into master
+    -->
+    <target name="process.mergetomaster.immediate" depends="
+        lock.check,
+        lock.lock,
+        api.pause,
+        fs.clear.outputdir,
+        git.pull.all,
+        git.data.merge.immediateintomaster">
+        <echo>Stage 1 (emergency) Success: Lockfile created, API paused, immediate branch merged into master.</echo>
+    </target>
+
+    <!--
+        Stage 1 of md process: manually triggered re-aggregation, signing & publication (without first merging any working branch).
+
+        Runs on: aggr
+
+        Process:
+            * Lock: Check for presence of lockfile, if not present, create it
+            * API: Pause the API
+            * FS: Make sure output directory is clear
+            * Git: Make sure all repos up to date
+            * Git: Merge immediate tree into master
+    -->
+    <target name="process.manual.retrigger" depends="
+        lock.check,
+        lock.lock,
+        fs.clear.outputdir,
+        api.pause,
+        git.pull.all">
+        <echo>Stage 1 (manual) Success: Lockfile created, API paused.</echo>
+    </target>
+
+    <!--
+        Stage 2 of md process: generate the unsigned aggregates
+
+        Runs on: aggr
+
+        Process:
+            * API: Unpause
+            * Git: Make sure we're on the master branch
+            * SAML MD: Generate unsigned aggregates
+            * Scp: Copy unsigned aggregates to orchestrator
+            * Jenkins: Trigger job on ochestrator to start signing process
+    -->
+    <target name="process.create-aggregates" depends="
+        api.unpause,
+        git.data.masterbranch.checkout,
+        samlmd.aggregates.generate,
+        fs.scp.unsigned.files.to.orchestrator,
+        jenkins.triggerjob.signing">
+        <echo>Stage 2 Success: Unsigned aggregates created, copied to orchestrator. Message sent to start signing.</echo>
+    </target>
+
+    <!--
+        Stage 3.0 of md process: create the signed aggregates / clear output dir
+
+        Runs on: keymaster
+
+        Process:
+            * FS: Clear outputdir
+    -->
+    <target name="process.sign-aggregates.clear.keymaster" depends="
+        fs.clear.outputdir">
+        <echo>Stage 3.0 Success: Output directory on keymaster cleared.</echo>
+    </target>
+
+    <!--
+        Stage 3.1 of md process: create the signed aggregates / update and copy to keymaster
+
+        Runs on: orchestrator
+
+        Process:
+            * Git: Make sure all repos up to date
+            * SCP: Copy files to keymaster
+    -->
+    <target name="process.sign-aggregates.prepare.and.scp" depends="
+        git.pull.all,
+        fs.scp.unsigned.files.to.keymaster">
+        <echo>Stage 3.1 Success: Aggregates send to keymaster for processing.</echo>
+    </target>
+
+    <!--
+        Stage 3.2 of md process: create the signed aggregates / sign
+
+        Runs on: keymaster
+
+        Process:
+            * SAML MD: Sign aggregates
+            * SAML MD: Verify signed aggregates
+    -->
+    <target name="process.sign-aggregates.sign" depends="
+        samlmd.aggregates.sign,
+        samlmd.aggregates.verify">
+        <echo>Stage 3.2 Success: Aggregates signed and verified".</echo>
+    </target>
+
+    <!--
+        Stage 3.3 of md process: create the signed aggregates / scp from keymaster and push
+
+        Runs on: orchestrator
+
+        Process:
+            * SCP: Copy files from keymaster
+            * FS: Copy other files from output dir into aggregates.dir so it'll get checked in
+            * Git: Add newly created files
+            * Git: Commit
+    -->
+    <target name="process.sign-aggregates.scp.and.push" depends="
+        fs.scp.signed.files.from.keymaster,
+        fs.cp.other.files.to.aggregates.dir,
+        git.products.addallnewfiles,
+        git.products.commit.signed">
+        <echo>Stage 3.3 Success: Signed aggregates and stats file comitted to data repository, pushed to origin.</echo>
+    </target>
+
+    <!--
+        Stage 4 of md process: collect the signed MDQ responses, tag the whole lot.
+
+        Runs on: orchestrator
+
+        Process:
+            * MDQ: Iterate through all entities, collect each representation of each entity's MD, save.
+            * Git: Add newly created files
+            * Git: Commit
+    -->
+    <target name="process.collectmdq" depends="
+        mdq.createcache">
+        <echo>Stage 4 Success: MDQ cache created (not yet implemented!); all files comitted to data repository.</echo>
+    </target>
+
+    <!--
+        Stage 5 of md process: collect the signed MDQ responses, tag the whole lot.
+
+        Runs on: orchestrator
+            * Git: Create New Tag
+            * Git: Push to origin
+            * Jenkins: Trigger publish task
+    -->
+    <target name="process.bagandtag" depends="
+        git.products.masterbranch.pushtoorigin,
+        git.products.createtagandpushtoorigin,
+        fs.clear.outputdir,
+        jenkins.triggerjob.publish">
+        <echo>Stage 5 Success: Master branch pushed to origin, new tag created and pushed, message sent to start publication.</echo>
+    </target>
+
+    <!--
+        Stage 6 of md process: publish
+
+        Runs on: aggr
+          * Git: Make sure repos are up to date
+          * Git: Merge master branch into immediate
+          * Git: Merge immediate branch into deferred
+          * SCP: Files to backend md servers
+          * SAML MD: Verify remote MD.
+          * Azure: Send purge to CDN
+          * Git: Make sure we're on master branch (to calculate git commits)
+          * Slack: Send notification to UKf channel
+    -->
+    <target name="process.publish" depends="
+        git.pull.all,
+        git.data.merge.masterintoimmediate,
+        git.data.merge.immediateintodeferred,
+        git.data.allbranches.pushtoorigin,
+        publish.md,
+        publish.otherfiles,
+        samlmd.aggregates.verify.remote,
+        azure.purgecdn,
+        lock.unlock,
+        git.data.masterbranch.checkout,
+        slack.notify.publication.success">
+        <echo>Stage 6 Success: Aggregates and MDQ cache pushed and verified.</echo>
+    </target>
+
+    <!--
+        Wrapper target to perform periodic status check on embedded certificates.
+        Uses deferred branch.
+        Assumes you've run a git.pull.all first, as this target doesn't do that.
+
+        Runs on: aggr
+
+        Process:
+            * Git: Checkout deferred branch
+            * check embedded certificates
+    -->
+    <target name="process.check.embedded.deferredbranch" depends="
+        git.data.deferredbranch.checkout,
+        check.embedded">
+        <echo>Checked embedded certificates.</echo>
+    </target>
+
+
+    <!--
+        ***************************************************
+        ***                                             ***
+        ***   A P I   H A N D L I N G   T A R G E T S   ***
+        ***                                             ***
+        ***************************************************
+    -->
+
+    <target name="api.pause">
+        <exec executable="echo" failonerror="true">
+            <arg value="'API pause not yet implemented. This is not a failure, other than a moral one.'"/>
+        </exec>
+    </target>
+
+    <target name="api.unpause">
+        <exec executable="echo" failonerror="true">
+            <arg value="'API unpause not yet implemented. This is not a failure, other than a moral one.'"/>
+        </exec>
+    </target>
+
+
+    <!--
+        *****************************************
+        ***                                   ***
+        ***   L O C K I N G   T A R G E T S   ***
+        ***                                   ***
+        *****************************************
+    -->
+
+    <target name="lock.check">
+        <echo>Checking for presence of lockfile...</echo>
+        <fail message="-> Lockfile present! Aborting.">
+            <condition>
+                <available file="${lockfile}"/>
+            </condition>
+        </fail>
+        <echo>-> No lockfile, continuing...</echo>
+    </target>
+
+    <target name="lock.lock">
+        <touch file="${lockfile}"/>
+    </target>
+
+    <target name="lock.unlock">
+        <delete file="${lockfile}"/>
+    </target>
+
+
+    <!--
+        *********************************
+        ***                           ***
+        ***   G I T   T A R G E T S   ***
+        ***                           ***
+        *********************************
+     -->
+
+    <!--
+        Full hard reset of all repositories
+    -->
+    <target name="git.hardreset.all">
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="master"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="fetch"/>
+            <arg value="origin"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="reset"/>
+            <arg value="--hard"/>
+            <arg value="origin/master"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="immediate"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="fetch"/>
+            <arg value="origin"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="reset"/>
+            <arg value="--hard"/>
+            <arg value="origin/immediate"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="deferred"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="fetch"/>
+            <arg value="origin"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="reset"/>
+            <arg value="--hard"/>
+            <arg value="deferred"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.products}" failonerror="true">
+            <arg value="fetch"/>
+            <arg value="origin"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.products}" failonerror="true">
+            <arg value="reset"/>
+            <arg value="--hard"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.tooling}" failonerror="true">
+            <arg value="fetch"/>
+            <arg value="origin"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.tooling}" failonerror="true">
+            <arg value="reset"/>
+            <arg value="--hard"/>
+        </exec>
+        <echo>All branches on all repositories, reset HARD.</echo>
+    </target>
+
+    <!--
+        Updates all of the local main repositories (all branches) from the origin.
+      -->
+    <target name="git.pull.all">
+        <echo>Pulling the latest state from all Git repositories (all branches).</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="master"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="pull"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="immediate"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="pull"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="deferred"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="pull"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.products}" failonerror="true">
+            <arg value="pull"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.tooling}" failonerror="true">
+            <arg value="pull"/>
+        </exec>
+    </target>
+
+    <!--
+      Merges deferred branch into immediate branch of data repo.
+    -->
+    <target name="git.data.merge.deferredintoimmediate">
+        <echo>Merging deferred branch into immediate branch of data repository.</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="immediate"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="merge"/>
+            <arg value="deferred"/>
+            <arg value="--ff-only"/>
+            <arg value="-m"/>
+            <arg value="'Merging deferred branch into immediate branch.'"/>
+        </exec>
+    </target>
+
+    <!--
+      Merges immediate branch into master branch of data repo
+    -->
+    <target name="git.data.merge.immediateintomaster">
+        <echo>Merging immediate branch into master branch of data repository.</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="master"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="merge"/>
+            <arg value="immediate"/>
+            <arg value="--ff-only"/>
+            <arg value="-m"/>
+            <arg value="'Merging immediate branch into master branch.'"/>
+        </exec>
+    </target>
+
+    <!--
+      Merges master branch into immediate branch of data repo
+    -->
+    <target name="git.data.merge.masterintoimmediate">
+        <echo>Merging master branch into immediate branch of data repository.</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="immediate"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="merge"/>
+            <arg value="master"/>
+            <arg value="--ff-only"/>
+            <arg value="-m"/>
+            <arg value="'Merging master branch into immediate branch.'"/>
+        </exec>
+    </target>
+
+    <!--
+      Merges immediate branch into deferred branch of data repo
+    -->
+    <target name="git.data.merge.immediateintodeferred">
+        <echo>Merging immediate branch into deferred branch of data repository.</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="deferred"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="merge"/>
+            <arg value="immediate"/>
+            <arg value="--ff-only"/>
+            <arg value="-m"/>
+            <arg value="'Merging immedate branch into deferred branch.'"/>
+        </exec>
+    </target>
+
+    <!--
+      Merges master branch into deferred branch of data repo
+    -->
+    <target name="git.data.merge.masterintodeferred">
+        <echo>Merging master branch into deferred branch of data repository.</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="deferred"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="merge"/>
+            <arg value="master"/>
+            <arg value="--ff-only"/>
+            <arg value="-m"/>
+            <arg value="'Merging immedate branch into deferred branch.'"/>
+        </exec>
+    </target>
+
+    <!--
+      Merges deferred branch into master branch of data repo
+    -->
+    <target name="git.data.merge.deferredintomaster">
+        <echo>Merging deferred branch into master branch of data repository.</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="master"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="merge"/>
+            <arg value="deferred"/>
+            <arg value="--ff-only"/>
+            <arg value="-m"/>
+            <arg value="'Merging immedate branch into deferred branch.'"/>
+        </exec>
+    </target>
+
+    <!--
+      Checks out master branch of data repository
+    -->
+    <target name="git.data.masterbranch.checkout">
+        <echo>Switching to deferred branch in data repository.</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="master"/>
+        </exec>
+    </target>
+
+    <!--
+      Checks out deferred branch of data repository
+    -->
+    <target name="git.data.deferredbranch.checkout">
+        <echo>Switching to deferred branch in data repository.</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="deferred"/>
+        </exec>
+    </target>
+
+    <!--
+      Checks out immediate branch of data repository
+    -->
+    <target name="git.data.immediatebranch.checkout">
+        <echo>Switching to immediate branch in data repository.</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="immediate"/>
+        </exec>
+    </target>
+
+    <!--
+        Push all branches of data repo to the origin
+    -->
+    <target name="git.data.allbranches.pushtoorigin">
+        <echo>Pushing all branches of data repository to origin</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="master"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="push"/>
+            <arg value="-u"/>
+            <arg value="origin"/>
+            <arg value="master"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="deferred"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="push"/>
+            <arg value="-u"/>
+            <arg value="origin"/>
+            <arg value="deferred"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="immediate"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="push"/>
+            <arg value="-u"/>
+            <arg value="origin"/>
+            <arg value="immediate"/>
+        </exec>
+    </target>
+
+    <!--
+        Push master branch of products repo to the origin
+    -->
+    <target name="git.products.masterbranch.pushtoorigin">
+        <echo>Pushing master branch of products repository to origin</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.products}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="master"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.products}" failonerror="true">
+            <arg value="push"/>
+            <arg value="-u"/>
+            <arg value="origin"/>
+            <arg value="master"/>
+        </exec>
+    </target>
+
+    <!--
+        Push master branch of data repo to the origin
+    -->
+    <target name="git.products.databranch.pushtoorigin">
+        <echo>Pushing master branch of data repository to origin</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="master"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="push"/>
+            <arg value="-u"/>
+            <arg value="origin"/>
+            <arg value="master"/>
+        </exec>
+    </target>
+
+    <!--
+        Push immediate branch of data repo to the origin
+    -->
+    <target name="git.data.immediatebranch.pushtoorigin">
+        <echo>Pushing immediate branch of data repository to origin</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="immediate"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="push"/>
+            <arg value="-u"/>
+            <arg value="origin"/>
+            <arg value="immediate"/>
+        </exec>
+    </target>
+
+    <!--
+      Push deferred branch of data repo to the origin
+    -->
+    <target name="git.data.deferredbranch.pushtoorigin">
+        <echo>Pushing deferred branch of data repository to origin</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="deferred"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.data}" failonerror="true">
+            <arg value="push"/>
+            <arg value="-u"/>
+            <arg value="origin"/>
+            <arg value="deferred"/>
+        </exec>
+    </target>
+
+    <!--
+       Add any new files in /aggregates of products repository to working set
+    -->
+    <target name="git.products.addallnewfiles">
+        <echo>Adding all new files in aggregates/ directory of products repository into Git working set.</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.products}" failonerror="true">
+            <arg value="add"/>
+            <arg value="aggregates/"/>
+        </exec>
+    </target>
+
+    <!--
+      Commit unsigned files to local products repository
+    -->
+    <target name="git.products.commit.unsigned">
+        <echo>Commiting all changes in products repository.</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.products}" failonerror="true">
+            <arg value="commit"/>
+            <arg value="-m"/>
+            <arg value="Commit new unsigned files into products repo"/>
+        </exec>
+    </target>
+
+    <!--
+      Commit signed files to local data repository (release branch):
+    -->
+    <target name="git.products.commit.signed">
+        <echo>Commiting all changes in products repository.</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.products}" failonerror="true">
+            <arg value="commit"/>
+            <arg value="-m"/>
+            <arg value="Commit new signed files into products repo"/>
+        </exec>
+    </target>
+
+    <!--
+      Creates a new tag on the master branch
+    -->
+    <target name="git.products.createtagandpushtoorigin">
+        <echo>Creating new Tag in master branch of products repository.</echo>
+        <tstamp>
+            <format property="DATE_UTC" pattern="yyyy-MM-dd" locale="UTC"/>
+        </tstamp>
+        <tstamp>
+            <format property="TIME_UTC" pattern="HH-mm" locale="UTC"/>
+        </tstamp>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.products}" failonerror="true">
+            <arg value="tag"/>
+            <arg value="-a"/>
+            <arg value="UKf_${DATE_UTC}_${TIME_UTC}"/>
+            <arg value="-m"/>
+            <arg value="'UK federation publication - ${DATE_UTC} ${TIME_UTC}'"/>
+        </exec>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.products}" failonerror="true">
+            <arg value="push"/>
+            <arg value="origin"/>
+            <arg value="UKf_${DATE_UTC}_${TIME_UTC}"/>
+        </exec>
+    </target>
+
+    <!--
+        Commit unsigned files to local products repository
+    -->
+    <target name="git.orchestrator.push.tooling.to.keymaster">
+        <echo>Commiting all changes in products repository.</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.tooling}" failonerror="true">
+            <arg value="push"/>
+            <arg value="keymaster"/>
+            <arg value="master"/>
+        </exec>
+    </target>
+
+
+    <!--
+        *****************************************
+        ***                                   ***
+        ***   J E N K I N S   T A R G E T S   ***
+        ***                                   ***
+        *****************************************
+    -->
+
+    <!--
+        Does a HTTP Get on the URL that triggers the Jenkins signing job, but only if one is not currently in progress.
+    -->
+    <target name="jenkins.triggerjob.signing">
+        <echo>Triggering Jenkins signing job</echo>
+        <get src="${jenkins.url.to.trigger.signing}" dest="${temp.dir}/get.out"/>
+    </target>
+
+    <!--
+        Does a HTTP Get on the URL that triggers the Jenkins publication job.
+    -->
+    <target name="jenkins.triggerjob.publish">
+        <echo>Triggering Jenkins publication Job.</echo>
+        <get src="${jenkins.url.to.trigger.publication}" dest="${temp.dir}/get.out"/>
+    </target>
+
+    <!--
+        ****************************************************
+        ***                                              ***
+        ***    S A M L   M D   V E R I F I C A T I O N   ***
+        ***                                              ***
+        ****************************************************
+    -->
+
+    <!--
+        Verify a metadata file held on the master distribution site.
+
+        Verification is performed using only xmlsectool. This should be
+        used when compatibility with the Shibboleth 1.3 IdP is not a
+        concern.
+    -->
+    <macrodef name="VFY.remote">
+        <attribute name="i"/>
+        <sequential>
+            <echo>Verifying @{i}...</echo>
+            <delete file="${temp.xml}" quiet="true" verbose="false"/>
+            <get src="@{i}" dest="${temp.xml}"/>
+
+            <!--
+                Verify using xmlsectool.
+            -->
+            <XMLSECTOOL.VFY.uk i="${temp.xml}"/>
+
+            <!--
+                Delete the temporary file.
+            -->
+            <delete file="${temp.xml}" quiet="true" verbose="false"/>
+        </sequential>
+    </macrodef>
+
+    <!--
+        Verify a metadata file held on the master distribution site.
+
+        Verification is performed using both metadatatool and xmlsectool.
+        This should be used when the file being verified must be compatible
+        with the Shibboleth 1.3 IdP.
+    -->
+    <macrodef name="VFY.remote.both">
+        <attribute name="i"/>
+        <sequential>
+            <echo>Verifying @{i}...</echo>
+            <delete file="${temp.xml}" quiet="true" verbose="false"/>
+            <get src="@{i}" dest="${temp.xml}"/>
+
+            <!--
+                Verify using metadatatool.
+            -->
+            <MDT.VFY.uk i="${temp.xml}"/>
+
+            <!--
+                Verify using xmlsectool.
+            -->
+            <XMLSECTOOL.VFY.uk i="${temp.xml}"/>
+
+            <!--
+                Delete the temporary file.
+            -->
+            <delete file="${temp.xml}" quiet="true" verbose="false"/>
+        </sequential>
+    </macrodef>
+
+    <!--
+        Verify a metadata file held on the master distribution site.
+
+        Verification is performed using both metadatatool and xmlsectool.
+        This should be used when the file being verified must be compatible
+        with the Shibboleth 1.3 IdP.
+
+        Additionally, it'll compare the provided checksum against that of the
+        downloaded file, to ensure the file has the content you expected.
+    -->
+    <macrodef name="VFY.remote.both.and.checksum">
+        <attribute name="i"/>
+        <attribute name="checksum"/>
+        <sequential>
+            <echo>Verifying @{i}...</echo>
+            <delete file="${temp.xml}" quiet="true" verbose="false"/>
+            <get src="@{i}" dest="${temp.xml}"/>
+
+            <!--
+                Check the checksum matches what was expected.
+            -->
+            <local name="checksum.of.downloaded.file"/>
+            <checksum file="${temp.xml}" property="checksum.of.downloaded.file"/>
+            <fail message="Checksum of file in repository and on backend server does NOT match.">
+                <condition>
+                    <not>
+                        <equals arg1="@{checksum}" arg2="${checksum.of.downloaded.file}"/>
+                    </not>
+                </condition>
+            </fail>
+            <echo>Checksum of file matches expected value</echo>
+
+            <!--
+                Verify using metadatatool.
+            -->
+            <MDT.VFY.uk i="${temp.xml}"/>
+
+            <!--
+                Verify using xmlsectool.
+            -->
+            <XMLSECTOOL.VFY.uk i="${temp.xml}"/>
+
+            <!--
+                Delete the temporary file.
+            -->
+            <delete file="${temp.xml}" quiet="true" verbose="false"/>
+        </sequential>
+    </macrodef>
+
+    <!--
+        Verify metadata files held on the master distribution site.
+    -->
+    <target name="samlmd.aggregates.verify.remote">
+        <echo>Computing checksums of each aggregate</echo>
+        <checksum file="${aggregates.dir}/${mdaggr.prod.signed}"
+            property="mdaggr.prod.signed.checksum"/>
+        <checksum file="${aggregates.dir}/${mdaggr.wayf.signed}"
+            property="mdaggr.wayf.signed.checksum"/>
+        <checksum file="${aggregates.dir}/${mdaggr.cdsall.signed}"
+            property="mdaggr.cdsall.signed.checksum"/>
+        <checksum file="${aggregates.dir}/${mdaggr.test.signed}"
+            property="mdaggr.test.signed.checksum"/>
+        <checksum file="${aggregates.dir}/${mdaggr.back.signed}"
+            property="mdaggr.back.signed.checksum"/>
+        <checksum file="${aggregates.dir}/${mdaggr.export.signed}"
+            property="mdaggr.export.signed.checksum"/>
+        <checksum file="${aggregates.dir}/${mdaggr.export.preview.signed}"
+            property="mdaggr.export.preview.signed.checksum"/>
+
+        <echo>Verifying metadata held at ${md.dist.host1.name}</echo>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host1.name}/${mdaggr.prod.signed}"
+            checksum="${mdaggr.prod.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host1.name}/${mdaggr.wayf.signed}"
+            checksum="${mdaggr.wayf.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host1.name}/${mdaggr.cdsall.signed}"
+            checksum="${mdaggr.cdsall.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host1.name}/${mdaggr.test.signed}"
+            checksum="${mdaggr.test.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host1.name}/${mdaggr.back.signed}"
+            checksum="${mdaggr.back.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host1.name}/${mdaggr.export.signed}"
+            checksum="${mdaggr.export.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host1.name}/${mdaggr.export.preview.signed}"
+            checksum="${mdaggr.export.preview.signed.checksum}"/>
+
+        <echo>Verifying metadata held at ${md.dist.host2.name}</echo>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host2.name}/${mdaggr.prod.signed}"
+            checksum="${mdaggr.prod.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host2.name}/${mdaggr.wayf.signed}"
+            checksum="${mdaggr.wayf.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host2.name}/${mdaggr.cdsall.signed}"
+            checksum="${mdaggr.cdsall.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host2.name}/${mdaggr.test.signed}"
+            checksum="${mdaggr.test.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host2.name}/${mdaggr.back.signed}"
+            checksum="${mdaggr.back.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host2.name}/${mdaggr.export.signed}"
+            checksum="${mdaggr.export.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host2.name}/${mdaggr.export.preview.signed}"
+            checksum="${mdaggr.export.preview.signed.checksum}"/>
+
+        <echo>Verifying metadata held at ${md.dist.host3.name}</echo>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host3.name}/${mdaggr.prod.signed}"
+            checksum="${mdaggr.prod.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host3.name}/${mdaggr.wayf.signed}"
+            checksum="${mdaggr.wayf.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host3.name}/${mdaggr.cdsall.signed}"
+            checksum="${mdaggr.cdsall.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host3.name}/${mdaggr.test.signed}"
+            checksum="${mdaggr.test.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host3.name}/${mdaggr.back.signed}"
+            checksum="${mdaggr.back.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host3.name}/${mdaggr.export.signed}"
+            checksum="${mdaggr.export.signed.checksum}"/>
+        <VFY.remote.both.and.checksum i="http://${md.dist.host3.name}/${mdaggr.export.preview.signed}"
+            checksum="${mdaggr.export.preview.signed.checksum}"/>
+
+        <echo>Verification completed.</echo>
+    </target>
+
+    <!--
+        *************************************************
+        ***                                           ***
+        ***   M E T A D A T A   G E N E R A T I O N   ***
+        ***                                           ***
+        *************************************************
+    -->
+
+    <!--
+        uk.collected
+
+        This is where the flow.uk.collect places its output.
+    -->
+    <property name="uk.collected" value="${mdx.dir}/uk/collected.xml"/>
+
+    <!--
+        flow.uk.collect
+
+        Runs the mda code to collect all entities registered with the
+        UK federation registrar.
+    -->
+    <target name="flow.uk.collect">
+        <CHANNEL.do channel="uk" verb="collect"/>
+    </target>
+
+    <!--
+        Runs the MDA on the uk channel's verify verb to verify that the UK-registered
+        metadata passes all the checks that would be imposed during a signing run.
+
+        No output files are produced by this operation.
+    -->
+    <target name="samlmd.aggregates.generate.dry-run">
+        <echo>Performing dry run of generating UKfed MD.</echo>
+        <CHANNEL.do channel="uk" verb="verify"/>
+        <echo>All UKfed metadata successfully verified.</echo>
+    </target>
+
+    <!--
+        Unsigned metadata generation for the UK Federation.
+    -->
+    <target name="samlmd.aggregates.generate">
+        <echo>Generating unsigned UKfed metadata files.</echo>
+
+        <!--
+            Call the generate verb in the uk mdx channel
+            to generate the following:
+
+               production aggregate
+               WAYF/CDS aggregates
+               test aggregate
+               export aggregate
+               export preview aggregate
+               fallback aggregate
+               statistics
+        -->
+        <CHANNEL.do channel="uk" verb="generate"/>
+
+        <!--
+            Post-process mda-generated output files.
+        -->
+        <MDNORM i="${output.dir}/${mdaggr.prod.unsigned}"/>
+        <MDNORM i="${output.dir}/${mdaggr.wayf.unsigned}"/>
+        <MDNORM.noblank i="${output.dir}/${mdaggr.cdsall.unsigned}"/>
+        <MDNORM i="${output.dir}/${mdaggr.test.unsigned}"/>
+        <MDNORM i="${output.dir}/${mdaggr.export.unsigned}"/>
+        <MDNORM i="${output.dir}/${mdaggr.export.preview.unsigned}"/>
+        <MDNORM i="${output.dir}/${mdaggr.back.unsigned}"/>
+        <fixcrlf file="${output.dir}/${mdaggr.stats}" eol="lf" encoding="UTF-8"/>
+
+        <echo>Generated UK unsigned metadata.</echo>
+    </target>
+
+
+    <!--
+        ***************************
+        ***                     ***
+        ***   M D A   T O O L   ***
+        ***                     ***
+        ***************************
+    -->
+
+    <!--
+        Property definitions for the mda tool.
+
+        Any Ant property with a name of the form "mda.*" is passed through
+        as a system property to the mda invocation with the "mda." stripped
+        off. Thus, a property "mda.foo" will be passed through as a system
+        property called "foo".
+
+        The individual properties listed here can be augmented or overridden
+        by properties defined in the external properties files, e.g., build.properties.
+    -->
+    <property name="mda.java.endorsed.dirs" value="${tools.dir}/endorsed"/>
+    <property name="mda.entities.dir" value="${entities.dir}"/>
+    <property name="mda.mdx.dir" value="${mdx.dir}"/>
+    <property name="mda.members.dir" value="${members.dir}"/>
+    <property name="mda.output.dir" value="${output.dir}"/>
+
+    <!--
+        Build a property set of all the properties to be passed through, with
+        the "mda." prefix stripped off.
+    -->
+    <propertyset id="mda.properties">
+        <propertyref prefix="mda."/>
+        <mapper type="glob" from="mda.*" to="*"/>
+    </propertyset>
+
+    <!--
+        Macro to run the mda (metadata aggregator CLI) tool.
+    -->
+    <macrodef name="MDA">
+        <!-- Spring pipeline configuration file -->
+        <attribute name="config"/>
+        <!-- pipeline bean ID -->
+        <attribute name="pipeline"/>
+        <sequential>
+            <java classname="net.shibboleth.metadata.cli.SimpleCommandLine"
+                fork="true" failonerror="true" maxmemory="${java.max.memory}">
+                <classpath>
+                    <!-- Spring "classpath:" imports can be under the MDX directory -->
+                    <pathelement path="${mdx.dir}"/>
+
+                    <!-- Include all APIs we may want to use. -->
+                    <fileset dir="${tools.mda}/lib">
+                        <include name="*.jar"/>
+                    </fileset>
+                    <fileset dir="${tools.dir}/ukf-mda">
+                        <include name="*.jar"/>
+                    </fileset>
+                    <fileset dir="${tools.dir}/xalan/lib">
+                        <include name="sdss-xalan-md-*.jar"/>
+                    </fileset>
+                </classpath>
+                <syspropertyset>
+                    <propertyset refid="mda.properties"/>
+                </syspropertyset>
+                <jvmarg value="-enableassertions"/>
+                <arg value="--quiet"/>
+                <arg value="@{config}"/>
+                <arg value="@{pipeline}"/>
+            </java>
+        </sequential>
+    </macrodef>
+
+    <!--
+        *********************************
+        ***                           ***
+        ***   M D N O R M   T O O L   ***
+        ***                           ***
+        *********************************
+    -->
+
+    <!--
+        MDNORM
+
+        Macro to call tool to perform textual normalisation on an XML file
+        containing a metadata aggregate.
+
+        Parameter 'i' is the file to be normalised.
+    -->
+    <macrodef name="MDNORM">
+        <attribute name="i"/><!-- input file -->
+        <element name="args" optional="yes"/>
+        <sequential>
+            <java fork="true" maxmemory="${java.max.memory}" failonerror="true" classname="uk.org.ukfederation.mdnorm.Normalise">
+                <classpath>
+                    <fileset dir="${tools.mdnorm}/lib">
+                        <include name="*.jar"/>
+                    </fileset>
+                </classpath>
+                <args/>
+                <arg value="@{i}"/>
+            </java>
+        </sequential>
+    </macrodef>
+
+    <!--
+        MDNORM.noblank
+
+        Call MDNORM but discard blank lines from the output.
+    -->
+    <macrodef name="MDNORM.noblank">
+        <attribute name="i"/><!-- input file -->
+        <sequential>
+            <MDNORM i="@{i}">
+                <args>
+                    <arg value="--discardBlankLines"/>
+                </args>
+            </MDNORM>
+        </sequential>
+    </macrodef>
+
+    <!--
+        *********************************************
+        ***                                       ***
+        ***   M E T A D A T A T O O L   T O O L   ***
+        ***                                       ***
+        *********************************************
+    -->
+
+    <!--
+        Macro to run the metadatatool application with appropriate defaults.
+    -->
+    <macrodef name="MDT">
+        <attribute name="i"/><!-- input file -->
+        <attribute name="o"/><!-- output file -->
+        <attribute name="keystore"/><!-- keystore file -->
+        <attribute name="storetype" default="JKS"/><!-- type of keystore to use -->
+        <attribute name="alias"/><!-- alias of key to use -->
+        <element name="args" optional="yes"/>
+        <sequential>
+            <java classname="edu.internet2.middleware.shibboleth.utils.MetadataTool"
+                fork="true" failonerror="true" maxmemory="${java.max.memory}">
+                <classpath>
+                    <fileset dir="${tools.metadatatool}/lib">
+                        <include name="*.jar"/>
+                    </fileset>
+                </classpath>
+                <jvmarg value="-Djava.endorsed.dirs=${tools.metadatatool}/endorsed"/>
+                <args/>
+                <arg value="--keystore"/>
+                <arg value="@{keystore}"/>
+                <arg value="--storetype"/>
+                <arg value="@{storetype}"/>
+                <arg value="--alias"/>
+                <arg value="@{alias}"/>
+                <arg value="--in"/>
+                <arg value="file:@{i}"/>
+                <arg value="--out"/>
+                <arg value="@{o}"/>
+            </java>
+        </sequential>
+    </macrodef>
+
+    <macrodef name="MDT.VFY.uk">
+        <attribute name="i"/>
+        <sequential>
+            <MDT i="@{i}" o="${null.device}"
+                keystore="${mdx.dir}/uk/ukfederation-2014.jks"
+                alias="${keystore.uk.vfy.alias}"/>
+        </sequential>
+    </macrodef>
+
+    <!--
+        ***********************************
+        ***                             ***
+        ***  S L A C K T E E   T O O L  ***
+        ***                             ***
+        ***********************************
+    -->
+
+    <macrodef name="SLACK.send">
+        <attribute name="conf"/>
+        <attribute name="colour"/>
+        <attribute name="message"/>
+        <sequential>
+            <exec executable="bash" failonerror="true">
+                <arg value="-c"/>
+                <arg value="echo -e '@{message}' | ${tools.slacktee}/bin/slacktee.sh -p --config @{conf} -a @{colour}"/>
+            </exec>
+        </sequential>
+    </macrodef>
+
+    <!--
+        Send success notification to slack channel
+    -->
+    <target name="slack.notify.publication.success">
+        <!-- Only send when we're doing prod flows -->
+        <if>
+            <equals arg1="${env}" arg2="prod"/>
+            <then>
+                <exec executable="bash" failonerror="true" outputproperty="diff.between.publications">
+                    <arg value="${utilities.dir}/diff-between-publications.sh"/>
+                    <arg value="${shared.ws.dir}"/>
+                    <arg value="${git.repo.group}"/>
+                    <arg value="${git.repo.project.data}"/>
+                    <arg value="${git.repo.project.products}"/>
+                </exec>
+                <SLACK.send conf="${tools.slacktee}/conf/aggr-ant.conf" colour="good"
+                    message="${diff.between.publications}"/>
+            </then>
+        </if>
+    </target>
+
+    <!--
+        *****************************************
+        ***                                   ***
+        ***   X M L S E C T O O L   T O O L   ***
+        ***                                   ***
+        *****************************************
+    -->
+
+    <macrodef name="XMLSECTOOL">
+        <attribute name="i"/><!-- input file -->
+        <element name="args" optional="yes"/>
+        <sequential>
+            <java classname="net.shibboleth.tool.xmlsectool.XMLSecTool"
+                fork="true" failonerror="true" maxmemory="${java.max.memory}">
+                <classpath>
+                    <fileset dir="${tools.xmlsectool}/lib">
+                        <include name="*.jar"/>
+                    </fileset>
+                </classpath>
+                <args/>
+                <arg value="--validateSchema"/>
+                <arg value="--schemaDirectory"/>
+                <arg value="${mdx.dir}/schema"/>
+                <arg value="--inFile"/>
+                <arg value="@{i}"/>
+            </java>
+        </sequential>
+    </macrodef>
+
+    <macrodef name="XMLSECTOOL.SIGN.uk">
+        <attribute name="i"/><!-- input file -->
+        <attribute name="o"/><!-- output file -->
+        <attribute name="digest"/><!-- digest function to use -->
+        <sequential>
+            <!-- delete the temporary file to be sure we don't use old data -->
+            <delete file="${temp.xml}" quiet="true" verbose="false"/>
+
+            <echo>Signing @{i} using digest @{digest}.</echo>
+
+            <!-- perform signing operation into temporary file -->
+            <XMLSECTOOL i="@{i}">
+                <args>
+                    <arg value="--sign"/>
+
+                    <!-- set digest to use -->
+                    <arg value="--digest"/>
+                    <arg value="@{digest}"/>
+
+                    <!--
+                        If we have a PKCS#11 configuration specified, include it.
+                    -->
+                    <arg if:set="sign.uk.pkcs11Config" value="--pkcs11Config"/>
+                    <arg if:set="sign.uk.pkcs11Config" value="${sign.uk.pkcs11Config}"/>
+
+                    <!--
+                        If we have a non-default keystore provider specified, include it.
+                    -->
+                    <arg if:set="sign.uk.keystoreProvider" value="--keystoreProvider"/>
+                    <arg if:set="sign.uk.keystoreProvider" value="${sign.uk.keystoreProvider}"/>
+
+                    <!--
+                        The "key" option can represent either a key file or a key alias.
+                        Different properties are used for the two cases (see XSTJ-67).
+                    -->
+                    <arg if:set="sign.uk.keyFile" value="--key"/>
+                    <arg if:set="sign.uk.keyFile" value="${sign.uk.keyFile}"/>
+                    <arg if:set="sign.uk.keyAlias" value="--key"/>
+                    <arg if:set="sign.uk.keyAlias" value="${sign.uk.keyAlias}"/>
+
+                    <!--
+                        Include an X.509 certificate if one is specified.
+                    -->
+                    <arg if:set="sign.uk.certificate" value="--certificate"/>
+                    <arg if:set="sign.uk.certificate" value="${sign.uk.certificate}"/>
+
+                    <arg value="--keyPassword"/>
+                    <arg value="${sign.uk.keyPassword}"/>
+
+                    <arg value="--outFile"/>
+                    <arg value="@{o}"/>
+                    <arg value="--referenceIdAttributeName"/>
+                    <arg value="ID"/>
+                    <!--
+                    <arg value="- -quiet"/>
+                    -->
+                </args>
+            </XMLSECTOOL>
+
+            <!-- Force the output file to use Unix line endings -->
+            <fixcrlf file="@{o}" eol="lf" encoding="UTF-8"/>
+
+        </sequential>
+    </macrodef>
+
+    <macrodef name="XMLSECTOOL.VFY.uk">
+        <attribute name="i"/><!-- input file -->
+        <sequential>
+            <XMLSECTOOL i="@{i}">
+                <args>
+                    <arg value="--verifySignature"/>
+                    <arg value="--certificate"/>
+                    <arg value="${mdx.dir}/uk/ukfederation-2014.pem"/>
+                    <!--
+                    <arg value="- -quiet"/>
+                    -->
+                </args>
+            </XMLSECTOOL>
+        </sequential>
+    </macrodef>
+
+    <!--
+        *******************************
+        ***                         ***
+        ***   X A L A N   T O O L   ***
+        ***                         ***
+        *******************************
+    -->
+
+    <!--
+        Macro to run the Xalan XSLT engine, taking files from arbitrary
+        locations.
+    -->
+    <macrodef name="XALAN">
+        <attribute name="i"/>
+        <attribute name="o"/>
+        <attribute name="x"/>
+        <sequential>
+            <java fork="true" maxmemory="${java.max.memory}" failonerror="true" classname="org.apache.xalan.xslt.Process">
+                <classpath>
+                    <fileset dir="${tools.xalan}/lib">
+                        <include name="*.jar"/>
+                    </fileset>
+                </classpath>
+                <jvmarg value="-Djava.endorsed.dirs=${tools.xalan}/endorsed"/>
+                <arg value="-IN"/>
+                <arg value="@{i}"/>
+                <arg value="-OUT"/>
+                <arg value="@{o}"/>
+                <arg value="-XSL"/>
+                <arg value="@{x}"/>
+            </java>
+        </sequential>
+    </macrodef>
+
+    <!--
+        Macro to run the Xalan XSLT engine, taking files from arbitrary
+        locations.  No output specified, so the result of the transform
+        will be sent to standard output.
+    -->
+    <macrodef name="XALAN.noout">
+        <attribute name="i"/>
+        <attribute name="x"/>
+        <sequential>
+            <java fork="true" maxmemory="${java.max.memory}" failonerror="true" classname="org.apache.xalan.xslt.Process">
+                <classpath>
+                    <fileset dir="${tools.xalan}/lib">
+                        <include name="*.jar"/>
+                    </fileset>
+                </classpath>
+                <jvmarg value="-Djava.endorsed.dirs=${tools.xalan}/endorsed"/>
+                <arg value="-IN"/>
+                <arg value="@{i}"/>
+                <arg value="-XSL"/>
+                <arg value="@{x}"/>
+            </java>
+        </sequential>
+    </macrodef>
+
+    <!--
+        *******************************************
+        ***                                     ***
+        ***   M E T A D A T A   S I G N I N G   ***
+        ***                                     ***
+        *******************************************
+    -->
+
+    <!--
+        Acquire the signing keystore password.
+
+        Note: this will not result in a prompt if the sign.uk.keyPassword property
+        is already defined.
+    -->
+    <target name="get.sign.uk.keyPassword" unless="sign.uk.keyPassword">
+        <input addproperty="sign.uk.keyPassword">
+            Please enter the password for the keystores:
+        </input>
+    </target>
+
+    <!--
+        Select tool to sign UK federation metadata with.
+    -->
+    <macrodef name="SIGN.uk">
+        <attribute name="i"/>
+        <attribute name="o"/>
+        <attribute name="digest"/><!-- digest function to use -->
+        <sequential>
+            <XMLSECTOOL.SIGN.uk i="@{i}" o="@{o}" digest="@{digest}"/>
+        </sequential>
+    </macrodef>
+
+    <!--
+      Signs the unsigned aggregates
+    -->
+    <target name="samlmd.aggregates.sign" depends="get.sign.uk.keyPassword">
+        <echo>Signing unsigned aggregates.</echo>
+
+        <echo>Signing UKfed prod metadata.</echo>
+        <SIGN.uk i="${output.dir}/${mdaggr.prod.unsigned}" o="${output.dir}/${mdaggr.prod.signed}" digest="SHA-256"/>
+
+        <echo>Signing UKfed WAYF metadata.</echo>
+        <SIGN.uk i="${output.dir}/${mdaggr.wayf.unsigned}" o="${output.dir}/${mdaggr.wayf.signed}" digest="SHA-256"/>
+
+        <echo>Signing UKfed CDS full metadata.</echo>
+        <SIGN.uk i="${output.dir}/${mdaggr.cdsall.unsigned}" o="${output.dir}/${mdaggr.cdsall.signed}" digest="SHA-256"/>
+
+        <echo>Signing UKfed test metadata.</echo>
+        <SIGN.uk i="${output.dir}/${mdaggr.test.unsigned}" o="${output.dir}/${mdaggr.test.signed}" digest="SHA-256"/>
+
+        <echo>Signing UKfed export metadata.</echo>
+        <SIGN.uk i="${output.dir}/${mdaggr.export.unsigned}" o="${output.dir}/${mdaggr.export.signed}" digest="SHA-256"/>
+
+        <echo>Signing UKfed export preview metadata.</echo>
+        <SIGN.uk i="${output.dir}/${mdaggr.export.preview.unsigned}" o="${output.dir}/${mdaggr.export.preview.signed}" digest="SHA-256"/>
+
+        <echo>Signing UKfed fallback metadata.</echo>
+        <SIGN.uk i="${output.dir}/${mdaggr.back.unsigned}" o="${output.dir}/${mdaggr.back.signed}" digest="SHA-256"/>
+
+    </target>
+
+    <!--
+        Verify UK federation metadata with both verification tools.
+
+        This should be used when the metadata needs to be compatible
+        with the Shibboleth 1.3 IdP.
+    -->
+    <macrodef name="VFY.uk.both">
+        <attribute name="i"/>
+        <sequential>
+            <!--
+                Verify using metadatatool.
+            -->
+            <MDT.VFY.uk i="@{i}"/>
+
+            <!--
+                Verify using xmlsectool.
+            -->
+            <XMLSECTOOL.VFY.uk i="@{i}"/>
+
+        </sequential>
+    </macrodef>
+
+    <!--
+        Verify the signed aggregates.
+    -->
+    <target name="samlmd.aggregates.verify">
+        <echo>Verifying signed UK metadata.</echo>
+        <VFY.uk.both i="${output.dir}/${mdaggr.prod.signed}"/>
+
+        <echo>Verifying signed UK WAYF metadata.</echo>
+        <VFY.uk.both i="${output.dir}/${mdaggr.wayf.signed}"/>
+
+        <echo>Verifying signed UK CDS full metadata.</echo>
+        <VFY.uk.both i="${output.dir}/${mdaggr.cdsall.signed}"/>
+
+        <echo>Verifying signed UK test metadata.</echo>
+        <VFY.uk.both i="${output.dir}/${mdaggr.test.signed}"/>
+
+        <echo>Verifying signed UK export metadata.</echo>
+        <VFY.uk.both i="${output.dir}/${mdaggr.export.signed}"/>
+
+        <echo>Verifying signed UK export preview metadata.</echo>
+        <VFY.uk.both i="${output.dir}/${mdaggr.export.preview.signed}"/>
+
+        <echo>Verifying signed UK fallback metadata.</echo>
+        <VFY.uk.both i="${output.dir}/${mdaggr.back.signed}"/>
+
+        <echo>Verification completed.</echo>
+    </target>
+
+
+    <!--
+        *******************************************************
+        ***                                                 ***
+        ***   F I L E S Y S T E M   O P S   T A R G E T S   ***
+        ***                                                 ***
+        *******************************************************
+    -->
+
+    <target name="fs.clear.outputdir">
+        <echo>Clearing output directory.</echo>
+        <delete includeemptydirs="true">
+            <fileset dir="${output.dir}" includes="**/*"/>
+        </delete>
+    </target>
+
+    <target name="fs.cp.other.files.to.aggregates.dir">
+        <echo>CPing other files that should be checked into git into orchestrator's aggregates dir.</echo>
+        <copy failonerror="true" todir="${aggregates.dir}">
+            <fileset dir="${output.dir}">
+                <include name="${mdaggr.stats}"/>
+            </fileset>
+        </copy>
+    </target>
+
+    <target name="fs.scp.unsigned.files.to.orchestrator">
+        <echo>SCPing unsigned files and stats file from output dir to orchestrator's build dir.</echo>
+        <scp failonerror="true" remoteTodir="${orchestrator.url}" keyfile="~/.ssh/id_rsa" knownhosts="~/.ssh/known_hosts">
+            <fileset dir="${output.dir}">
+                <include name="${mdaggr.prod.unsigned}"/>
+                <include name="${mdaggr.wayf.unsigned}"/>
+                <include name="${mdaggr.cdsall.unsigned}"/>
+                <include name="${mdaggr.test.unsigned}"/>
+                <include name="${mdaggr.back.unsigned}"/>
+                <include name="${mdaggr.export.unsigned}"/>
+                <include name="${mdaggr.export.preview.unsigned}"/>
+                <include name="${mdaggr.stats}"/>
+            </fileset>
+        </scp>
+    </target>
+
+    <target name="fs.scp.unsigned.files.to.keymaster">
+        <echo>SCPing unsigned aggregates from orchestrator's output dir to keymaster's build.dir.</echo>
+        <scp failonerror="true" remoteTodir="${keymaster.url}" keyfile="~/.ssh/id_rsa" knownhosts="~/.ssh/known_hosts">
+            <fileset dir="${output.dir}">
+                <include name="${mdaggr.prod.unsigned}"/>
+                <include name="${mdaggr.wayf.unsigned}"/>
+                <include name="${mdaggr.cdsall.unsigned}"/>
+                <include name="${mdaggr.test.unsigned}"/>
+                <include name="${mdaggr.back.unsigned}"/>
+                <include name="${mdaggr.export.unsigned}"/>
+                <include name="${mdaggr.export.preview.unsigned}"/>
+            </fileset>
+        </scp>
+    </target>
+
+    <target name="fs.scp.signed.files.from.keymaster">
+        <echo>SCPing signed aggregates from keymaster's output dir into orchestrator's aggregates dir.</echo>
+        <scp failonerror="true" remoteFile="${keymaster.url}/${mdaggr.prod.signed}" todir="${aggregates.dir}" keyfile="~/.ssh/id_rsa" knownhosts="~/.ssh/known_hosts"/>
+        <scp failonerror="true" remoteFile="${keymaster.url}/${mdaggr.wayf.signed}" todir="${aggregates.dir}" keyfile="~/.ssh/id_rsa" knownhosts="~/.ssh/known_hosts"/>
+        <scp failonerror="true" remoteFile="${keymaster.url}/${mdaggr.cdsall.signed}" todir="${aggregates.dir}" keyfile="~/.ssh/id_rsa" knownhosts="~/.ssh/known_hosts"/>
+        <scp failonerror="true" remoteFile="${keymaster.url}/${mdaggr.test.signed}" todir="${aggregates.dir}" keyfile="~/.ssh/id_rsa" knownhosts="~/.ssh/known_hosts"/>
+        <scp failonerror="true" remoteFile="${keymaster.url}/${mdaggr.back.signed}" todir="${aggregates.dir}" keyfile="~/.ssh/id_rsa" knownhosts="~/.ssh/known_hosts"/>
+        <scp failonerror="true" remoteFile="${keymaster.url}/${mdaggr.export.signed}" todir="${aggregates.dir}" keyfile="~/.ssh/id_rsa" knownhosts="~/.ssh/known_hosts"/>
+        <scp failonerror="true" remoteFile="${keymaster.url}/${mdaggr.export.preview.signed}" todir="${aggregates.dir}" keyfile="~/.ssh/id_rsa" knownhosts="~/.ssh/known_hosts"/>
+    </target>
+
+
+    <!--
+        ***************************************************
+        ***                                             ***
+        ***   M D Q   H A N D L I N G   T A R G E T S   ***
+        ***                                             ***
+        ***************************************************
+    -->
+
+    <target name="mdq.createcache">
+        <echo>Creating MDQ cache.</echo>
+        <echo>-> Not yet implemented. This is not a failure, other than a moral one</echo>
+    </target>
+
+
+    <!--
+        **************************************
+        ***                                ***
+        ***    A Z U R E   T A R G E T S   ***
+        ***                                ***
+        **************************************
+    -->
+
+    <target name="azure.purgecdn">
+        <echo>Sending Purge command to Azure CDN.</echo>
+        <echo>-> Not yet implemented. This is not a failure, other than a moral one</echo>
+    </target>
+
+
+    <!--
+        ***********************************************
+        ***                                         ***
+        ***   P U B L I S H I N G   T A R G E T S   ***
+        ***                                         ***
+        ***********************************************
+    -->
+
+    <target name="publish.md">
+        <!--
+            Push metadata files for the UK Federation to the MD dist servers
+        -->
+        <echo>Pushing UK Federation metadata files to MD dist.</echo>
+        <echo>-> MD1</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.products}" failonerror="true">
+            <arg value="push"/>
+            <arg value="md1"/>
+            <arg value="master"/>
+        </exec>
+        <echo>-> MD2</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.products}" failonerror="true">
+            <arg value="push"/>
+            <arg value="md2"/>
+            <arg value="master"/>
+        </exec>
+        <echo>-> MD3</echo>
+        <exec executable="${git.executable}" dir="${shared.ws.dir}/${git.repo.project.products}" failonerror="true">
+            <arg value="push"/>
+            <arg value="md3"/>
+            <arg value="master"/>
+        </exec>
+    </target>
+
+    <target name="publish.otherfiles">
+        <!--
+            Push other files for the UK Federation to the web server - but only when in prod env!
+        -->
+        <if>
+            <equals arg1="${env}" arg2="prod"/>
+                <then>
+                    <echo>Pushing UK Federation other files to web site.</echo>
+                    <echo>-> Web1</echo>
+                    <scp failonerror="true" remoteTodir="${www.url}" keyfile="~/.ssh/id_rsa" knownhosts="~/.ssh/known_hosts">
+                        <fileset dir="${aggregates.dir}">
+                            <include name="${mdaggr.stats}"/>
+                        </fileset>
+                    </scp>
+                </then>
+        </if>
+    </target>
+
+
+    <!--
+        *****************************************
+        ***                                   ***
+        ***   M E T A D A T A   I M P O R T   ***
+        ***                                   ***
+        *****************************************
+    -->
+
+    <target name="import.metadata">
+        <echo>Importing metadata from ${entities.dir}/import.xml</echo>
+        <delete file="${entities.dir}/imported.xml" quiet="true" verbose="false"/>
+        <CHANNEL.do channel="uk" verb="import.metadata"/>
+        <echo>Imported metadata to ${entities.dir}/imported.xml</echo>
+        <fixcrlf file="${entities.dir}/imported.xml" encoding="UTF-8"/>
+    </target>
+
+    <!--
+        *********************************************
+        ***                                       ***
+        ***   M E T A D A T A   E X C H A N G E   ***
+        ***                                       ***
+        *********************************************
+    -->
+
+    <!--
+        Aggregator based work is divided into channels, each of
+        which lives in a directory under /mdx/.  Each channel
+        can have a number of verbs which can be executed.
+
+        Conventions for this system are documented in
+        /mdx/conventions.md.
+    -->
+
+    <!--
+        CHANNEL.do
+
+        Run a particular flow in the named channel.
+    -->
+    <macrodef name="CHANNEL.do">
+        <attribute name="channel"/><!-- channel name -->
+        <attribute name="verb"/><!-- verb to perform -->
+        <sequential>
+            <echo>Running @{channel} @{verb} flow.</echo>
+            <if>
+                <available file="${mdx.dir}/@{channel}/@{verb}.xml"/>
+                <then>
+                    <MDA config="${mdx.dir}/@{channel}/@{verb}.xml"
+                        pipeline="@{verb}"/>
+                </then>
+                <else>
+                    <MDA config="${mdx.dir}/@{channel}/verbs.xml"
+                        pipeline="@{verb}"/>
+                </else>
+            </if>
+            <echo>Completed @{channel} @{verb} flow.</echo>
+        </sequential>
+    </macrodef>
+
+    <!--
+        flow
+
+        Prompt for a channel name and a verb, and run that verb in that channel.
+    -->
+    <target name="flow">
+        <input addproperty="channel">
+            Please select the channel to use (e.g., us_incommon):
+        </input>
+        <input addproperty="verb">
+            Please select the verb to execute (e.g., import):
+        </input>
+        <CHANNEL.do channel="${channel}" verb="${verb}"/>
+    </target>
+
+    <!--
+        CHANNEL.import
+
+        Run the import flow from the named channel.
+    -->
+    <macrodef name="CHANNEL.import">
+        <attribute name="channel"/><!-- channel name -->
+        <sequential>
+            <CHANNEL.do channel="@{channel}" verb="import"/>
+        </sequential>
+    </macrodef>
+
+    <!--
+        *******************************************************************
+        ***                                                             ***
+        ***   M D X :   N O N - P R O D U C T I O N   C H A N N E L S   ***
+        ***                                                             ***
+        *******************************************************************
+    -->
+
+    <target name="flow.import">
+        <input addproperty="channel">
+            Please select the channel to use (e.g., us_incommon):
+        </input>
+        <CHANNEL.import channel="${channel}"/>
+    </target>
+
+    <target name="flow.int_edugain.testImport">
+        <CHANNEL.do channel="int_edugain" verb="importTest"/>
+    </target>
+
+    <!--
+        flow.verify.cobweb
+
+        Verify the COBWEB metadata. Callable from Jenkins.
+    -->
+    <target name="flow.verify.cobweb">
+        <CHANNEL.do verb="verifyProduction" channel="int_cobweb"/>
+    </target>
+
+    <!--
+        flow.verifyEdugain.input
+
+        Verify the eduGAIN entities from a particular channel.
+
+        The intention is that this be called within Jenkins
+        with the channel name passed as a property, e.g.:
+
+            ant flow.verifyEdugain.input -Dchannel=se_swamid
+
+    -->
+    <target name="flow.verifyEdugain.input">
+        <CHANNEL.do verb="verifyEdugain" channel="${channel}"/>
+    </target>
+
+    <!--
+        flow.verifyEdugain.output
+
+        Verify the eduGAIN production aggregate.
+
+        The intention is that these targets be called from Jenkins.
+    -->
+    <target name="flow.verifyEdugain.output">
+        <CHANNEL.do verb="verify" channel="int_edugain"/>
+    </target>
+    <target name="flow.verifyEdugain.output.all">
+        <CHANNEL.do verb="verify.all" channel="int_edugain"/>
+    </target>
+    <target name="flow.verifyEdugain.output.recovered">
+        <CHANNEL.do verb="verify.recovered" channel="int_edugain"/>
+    </target>
+
+    <!--
+        *********************************
+        ***                           ***
+        ***   U I I N F O   L I S T   ***
+        ***                           ***
+        *********************************
+    -->
+
+    <target name="uiinfo.list">
+        <CHANNEL.do channel="uk" verb="collect"/>
+        <XALAN.noout i="${mdx.dir}/uk/collected.xml"
+               x="${build.dir}/list_uiinfo.xsl"/>
+    </target>
+
+    <!--
+        *******************************
+        ***                         ***
+        ***   M D U I   S T A T S   ***
+        ***                         ***
+        *******************************
+    -->
+
+    <target name="mdui.stats">
+        <input addproperty="channel">
+            Please select the channel to use (e.g., us_incommon):
+        </input>
+        <if>
+            <equals arg1="${channel}" arg2="uk"/>
+            <then>
+                <CHANNEL.do verb="collect" channel="uk"/>
+                <XALAN.noout i="${mdx.dir}/uk/collected.xml"
+                       x="${build.dir}/statistics_mdui.xsl"/>
+            </then>
+            <else>
+                <CHANNEL.do verb="importRaw" channel="${channel}"/>
+                <XALAN.noout i="${mdx.dir}/${channel}/imported.xml"
+                       x="${build.dir}/statistics_mdui.xsl"/>
+            </else>
+        </if>
+    </target>
+
+    <!--
+        *******************************
+        ***                         ***
+        ***   M I S C E L L A N Y   ***
+        ***                         ***
+        *******************************
+    -->
+
+    <!--
+        Statistics generation
+
+        Note that statistics are generated from the full registered fragment
+        data, so that the statistics process has access to information that will not
+        be included in published metadata.
+
+        This target does stand-alone statistics generation; in normal use, the
+        statistics are generated as a side-effect of the generate target.
+    -->
+    <target name="stats">
+        <CHANNEL.do channel="uk" verb="statistics"/>
+        <fixcrlf file="${output.dir}/${mdaggr.stats}" eol="lf" encoding="UTF-8"/>
+    </target>
+
+    <!--
+        Check mailing list against current metadata
+    -->
+    <target name="check.mailing.list" depends="flow.uk.collect">
+        <echo>Checking mailing list entries.</echo>
+        <exec executable="perl" dir="${build.dir}">
+            <arg value="${build.dir}/addresses.pl"/>
+        </exec>
+    </target>
+
+    <!--
+        Extract TLS locations from the UK federation metadata.
+    -->
+    <target name="extract.locs" depends="flow.uk.collect">
+        <echo>Extracting TLS locations</echo>
+        <exec executable="perl" dir="${build.dir}"
+            output="${build.dir}/locations.txt">
+            <arg value="${build.dir}/extract_locs.pl"/>
+        </exec>
+    </target>
+
+    <target name="extract.locs.noports" depends="flow.uk.collect">
+        <echo>Extracting TLS locations</echo>
+        <exec executable="perl" dir="${build.dir}"
+            output="${build.dir}/locations_noports.txt">
+            <arg value="${build.dir}/extract_locs_noports.pl"/>
+        </exec>
+    </target>
+
+    <!--
+        Utility to fold overlong embedded certificates.
+    -->
+    <target name="fold.embedded.certs">
+        <echo>Folding embedded certificates</echo>
+        <for param="file">
+            <path>
+                <fileset dir="${entities.dir}" includes="uk*.xml"/>
+            </path>
+            <sequential>
+                <exec executable="perl" dir="${entities.dir}">
+                    <arg value="-i"/>
+                    <arg value="${build.dir}/fold_cert.pl"/>
+                    <arg value="@{file}"/>
+                </exec>
+            </sequential>
+        </for>
+    </target>
+
+    <!--
+        Utility to remove the old Eduserv gateway certificate.
+    -->
+    <!--
+    <target name="remove.old.eduserv.cert">
+        <echo>Removing old Eduserv gateway certificate</echo>
+        <for param="file">
+            <path>
+                <fileset dir="${entities.dir}" includes="uk*.xml"/>
+            </path>
+            <sequential>
+                <exec executable="perl" dir="${entities.dir}">
+                    <arg value="-i"/>
+                    <arg value="${build.dir}/remove_old_eduserv_cert.pl"/>
+                    <arg value="@{file}"/>
+                </exec>
+            </sequential>
+        </for>
+    </target>
+    -->
+
+    <!--
+        Utility to add the second Eduserv gateway certificate.
+    -->
+    <!--
+    <target name="add.second.eduserv.cert">
+        <echo>Adding second Eduserv gateway certificate</echo>
+        <for param="file">
+            <path>
+                <fileset dir="${entities.dir}" includes="uk*.xml"/>
+            </path>
+            <sequential>
+                <exec executable="perl" dir="${entities.dir}">
+                    <arg value="-i"/>
+                    <arg value="${build.dir}/add_second_eduserv_cert.pl"/>
+                    <arg value="@{file}"/>
+                </exec>
+            </sequential>
+        </for>
+    </target>
+    -->
+
+    <!--
+        Utility to apply a one-off change to every fragment file.
+
+        The perl script is applied in "-i" mode to perform in-place
+        editing; this only works well on Unix-like systems.
+
+        Comment this out when not in use to avoid accidents.
+    -->
+    <!--
+    <target name="fix.fragments">
+        <for param="file">
+            <path>
+                <fileset dir="${entities.dir}" includes="uk*.xml"/>
+            </path>
+            <sequential>
+                <echo>processing @{file}</echo>
+                <exec executable="perl" dir="${entities.dir}">
+                    <arg value="-i"/>
+                    <arg value="${build.dir}/fix_fragment.pl"/>
+                    <arg value="@{file}"/>
+                </exec>
+            </sequential>
+        </for>
+    </target>
+    -->
+
+    <!--
+        Extract embedded certificates
+    -->
+    <target name="extract.embedded" depends="flow.uk.collect">
+        <echo>Extracting embedded certificates</echo>
+        <XALAN
+            i="${uk.collected}"
+            o="${temp.dir}/embedded.pem"
+            x="${build.dir}/extract_embedded.xsl"/>
+    </target>
+
+    <!--
+        Check embedded certificates.
+    -->
+    <target name="check.embedded" depends="extract.embedded">
+        <echo>Checking embedded certificates</echo>
+        <exec executable="perl" dir="${utilities.dir}"
+            input="${temp.dir}/embedded.pem">
+            <arg value="${utilities.dir}/check_embedded.pl"/>
+            <arg value="-q"/>
+        </exec>
+        <delete file="${temp.dir}/embedded.pem" quiet="true" verbose="false"/>
+    </target>
+
+    <!--
+       Check for IdPs using the single-port configuration.
+    -->
+    <target name="check.ports">
+        <echo>Checking vhost use</echo>
+        <CHANNEL.do verb="checkPorts" channel="uk"/>
+        <echo>Checked.</echo>
+    </target>
+
+    <!--
+        check.uk.future
+
+        Run a set of possible future rulesets against the existing collection
+        of UK-federation registered metadata.
+    -->
+    <target name="check.uk.future">
+        <echo>Checking against future rulesets.</echo>
+        <CHANNEL.do verb="checkFuture" channel="uk"/>
+        <echo>Check complete.</echo>
+    </target>
+
+    <!--
+        echoproperties
+
+        List all the properties ant is using.
+    -->
+    <target name="echoproperties">
+        <echo>All properties:</echo>
+        <echoproperties/>
+        <echo>MDA properties:</echo>
+        <echoproperties>
+            <propertyset>
+                <propertyset refid="mda.properties"/>
+            </propertyset>
+        </echoproperties>
+    </target>
+
+</project>

@@ -1,0 +1,379 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Verb definitions for this channel.
+-->
+<beans xmlns="http://www.springframework.org/schema/beans"
+    default-lazy-init="true"
+    xmlns:c="http://www.springframework.org/schema/c"
+    xmlns:p="http://www.springframework.org/schema/p"
+    xmlns:util="http://www.springframework.org/schema/util"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+        http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
+    
+    <!--
+        Import commonly used beans.
+    -->
+    <import resource="classpath:common-beans.xml"/>
+        
+    <!--
+        Import channel-specific beans.
+    -->
+    <import resource="classpath:it_idem/beans.xml"/>
+    
+    <!-- IDEM PRODUCTION FEDERATION METADATA -->
+   
+    <!-- idem-metadata.xml -->
+    <bean id="it_idem_serialize_prod_unsigned" parent="SerializationStage">
+        <property name="id" value="it_idem_serialize_prod_unsigned"/>
+        <property name="outputFile">
+            <bean class="java.io.File">
+                <constructor-arg value="${mdx.dir}/it_idem/md-out/idem-metadata.xml"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- idem-metadata-sha1.xml -->
+    <bean id="it_idem_serialize_prod_signed_sha1" parent="SerializationStage">
+        <property name="id" value="it_idem_serialize_prod_signed_sha1"/>
+        <property name="outputFile">
+            <bean class="java.io.File">
+                <constructor-arg value="${mdx.dir}/it_idem/md-out/idem-metadata-sha1.xml"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- idem-metadata-sha256.xml -->
+    <bean id="it_idem_serialize_prod_signed_sha256" parent="SerializationStage">
+        <property name="id" value="it_idem_serialize_prod_signed_sha256"/>
+        <property name="outputFile">
+            <bean class="java.io.File">
+                <constructor-arg value="${mdx.dir}/it_idem/md-out/idem-metadata-sha256.xml"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- IDEM TEST FEDERATION METADATA -->
+
+    <!-- idem-test-metadata.xml -->
+    <bean id="it_idem_serialize_test_unsigned" parent="SerializationStage">
+        <property name="id" value="it_idem_serialize_test_unsigned"/>
+        <property name="outputFile">
+            <bean class="java.io.File">
+                <constructor-arg value="${mdx.dir}/it_idem/md-out/idem-test-metadata.xml"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- idem-test-metadata-sha1.xml -->
+    <bean id="it_idem_serialize_test_signed_sha1" parent="SerializationStage">
+        <property name="id" value="it_idem_serialize_test_signed_sha1"/>
+        <property name="outputFile">
+            <bean class="java.io.File">
+                <constructor-arg value="${mdx.dir}/it_idem/md-out/idem-test-metadata-sha1.xml"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- idem-test-metadata-sha256.xml -->
+    <bean id="it_idem_serialize_test_signed_sha256" parent="SerializationStage">
+        <property name="id" value="it_idem_serialize_test_signed_sha256"/>
+        <property name="outputFile">
+            <bean class="java.io.File">
+                <constructor-arg value="${mdx.dir}/it_idem/md-out/idem-test-metadata-sha256.xml"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- IDEM-EDUGAIN METADATA -->
+
+    <!-- edugain2idem-metadata.xml -->
+    <bean id="it_idem_serialize_edugain2idem_unsigned" parent="SerializationStage">
+        <property name="id" value="it_idem_serialize_edugain2idem_unsigned"/>
+        <property name="outputFile">
+            <bean class="java.io.File">
+                <constructor-arg value="${mdx.dir}/it_idem/md-out/edugain2idem-metadata.xml"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- edugain2idem-metadata-sha1.xml -->
+    <bean id="it_idem_serialize_edugain2idem_signed_sha1" parent="SerializationStage">
+        <property name="id" value="it_idem_serialize_edugain2idem_signed_sha1"/>
+        <property name="outputFile">
+            <bean class="java.io.File">
+                <constructor-arg value="${mdx.dir}/it_idem/md-out/edugain2idem-metadata-sha1.xml"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- edugain2idem-metadata-sha256.xml -->
+    <bean id="it_idem_serialize_edugain2idem_signed_sha256" parent="SerializationStage">
+        <property name="id" value="it_idem_serialize_edugain2idem_signed_sha256"/>
+        <property name="outputFile">
+            <bean class="java.io.File">
+                <constructor-arg value="${mdx.dir}/it_idem/md-out/edugain2idem-metadata-sha256.xml"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- idem2edugain-metadata.xml -->
+    <bean id="it_idem_serialize_idem2edugain_unsigned" parent="SerializationStage">
+        <property name="id" value="it_idem_serialize_idem2edugain_unsigned"/>
+        <property name="outputFile">
+            <bean class="java.io.File">
+                <constructor-arg value="${mdx.dir}/it_idem/md-out/idem2edugain-metadata.xml"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- idem2edugain-metadata-sha1.xml -->
+    <bean id="it_idem_serialize_idem2edugain_sha1" parent="SerializationStage">
+        <property name="id" value="it_idem_serialize_idem2edugain_sha1"/>
+        <property name="outputFile">
+            <bean class="java.io.File">
+                <constructor-arg value="${mdx.dir}/it_idem/md-out/idem2edugain-metadata-sha1.xml"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- idem2edugain-metadata-sha256.xml -->
+    <bean id="it_idem_serialize_idem2edugain_sha256" parent="SerializationStage">
+        <property name="id" value="it_idem_serialize_idem2edugain_sha256"/>
+        <property name="outputFile">
+            <bean class="java.io.File">
+                <constructor-arg value="${mdx.dir}/it_idem/md-out/idem2edugain-metadata-sha256.xml"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- Ant verbs -->
+    <bean id="idem-prod-check" parent="SimplePipeline">
+        <property name="id" value="idem-prod-check"/>
+        <property name="stages">
+            <list>
+                <ref bean="it_idem_prod_entities"/>
+                <ref bean="standardImportActions"/>
+                <ref bean="warningAndErrorAnnouncer"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="idem-metadata" parent="SimplePipeline">
+        <property name="id" value="idem-metadata"/>
+        <property name="stages">
+            <list>
+                <ref bean="it_idem_prod_entities"/>
+                <ref bean="standardImportActions"/>
+                <ref bean="it_idem_import_prod_tail"/>
+                <ref bean="it_idem_add_trust_roots"/>
+                <ref bean="stripUkfedlabelNamespace"/>
+                <ref bean="stripWayfNamespace"/>
+                <ref bean="it_idem_serialize_prod_unsigned"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="idem-metadata-sha1" parent="SimplePipeline">
+        <property name="id" value="idem-metadata-sha1"/>
+        <property name="stages">
+            <list>
+                <ref bean="it_idem_prod_entities"/>
+                <ref bean="standardImportActions"/>
+                <ref bean="it_idem_import_prod_tail"/>
+                <ref bean="it_idem_add_trust_roots"/>
+                <ref bean="stripUkfedlabelNamespace"/>
+                <ref bean="stripWayfNamespace"/>
+                <ref bean="it_idem_sign_sha1" />
+                <ref bean="it_idem_serialize_prod_signed_sha1"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="idem-metadata-sha256" parent="SimplePipeline">
+        <property name="id" value="idem-metadata-sha256"/>
+        <property name="stages">
+            <list>
+                <ref bean="it_idem_prod_entities"/>
+                <ref bean="standardImportActions"/>
+                <ref bean="it_idem_import_prod_tail"/>
+                <ref bean="it_idem_add_trust_roots"/>
+                <ref bean="stripUkfedlabelNamespace"/>
+                <ref bean="stripWayfNamespace"/>
+                <ref bean="it_idem_sign_sha256" />
+                <ref bean="it_idem_serialize_prod_signed_sha256"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="idem-test-check" parent="SimplePipeline">
+        <property name="id" value="idem-test-check"/>
+        <property name="stages">
+            <list>
+                <ref bean="it_idem_test_entities"/>
+                <ref bean="standardImportActions"/>
+                <ref bean="warningAndErrorAnnouncer"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="idem-test-metadata" parent="SimplePipeline">
+        <property name="id" value="idem-test-metadata"/>
+        <property name="stages">
+            <list>
+                <ref bean="it_idem_test_entities"/>
+                <ref bean="standardImportActions"/>
+                <ref bean="it_idem_import_test_tail"/>
+                <ref bean="it_idem_add_trust_roots"/>
+                <ref bean="stripUkfedlabelNamespace"/>
+                <ref bean="stripWayfNamespace"/>
+                <ref bean="it_idem_serialize_test_unsigned"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="idem-test-metadata-sha1" parent="SimplePipeline">
+        <property name="id" value="idem-test-metadata-sha1"/>
+        <property name="stages">
+            <list>
+                <ref bean="it_idem_test_entities"/>
+                <ref bean="standardImportActions"/>
+                <ref bean="it_idem_import_test_tail"/>
+                <ref bean="it_idem_add_trust_roots"/>
+                <ref bean="stripUkfedlabelNamespace"/>
+                <ref bean="stripWayfNamespace"/>
+                <ref bean="it_idem_sign_sha1" />
+                <ref bean="it_idem_serialize_test_signed_sha1"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="idem-test-metadata-sha256" parent="SimplePipeline">
+        <property name="id" value="idem-test-metadata-sha256"/>
+        <property name="stages">
+            <list>
+                <ref bean="it_idem_test_entities"/>
+                <ref bean="standardImportActions"/>
+                <ref bean="it_idem_import_test_tail"/>
+                <ref bean="it_idem_add_trust_roots"/>
+                <ref bean="stripUkfedlabelNamespace"/>
+                <ref bean="stripWayfNamespace"/>
+                <ref bean="it_idem_sign_sha256" />
+                <ref bean="it_idem_serialize_test_signed_sha256"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="idem2edugain-check" parent="SimplePipeline">
+        <property name="id" value="idem2edugain-check"/>
+        <property name="stages">
+            <list>
+                <ref bean="it_idem_idem2edugain_Entities"/>
+                <ref bean="standardImportActions"/>
+                <ref bean="warningAndErrorAnnouncer"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="idem2edugain-metadata" parent="SimplePipeline">
+        <property name="id" value="idem2edugain-metadata"/>
+        <property name="stages">
+            <list>
+                <ref bean="it_idem_idem2edugain_Entities"/>
+                <ref bean="standardImportActions"/>
+                <ref bean="it_idem_import_idem2edugain_tail"/>
+                <ref bean="it_idem_add_pub_info"/>
+                <ref bean="stripUkfedlabelNamespace"/>
+                <ref bean="stripWayfNamespace"/>
+                <ref bean="it_idem_serialize_idem2edugain_unsigned"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="idem2edugain-metadata-sha1" parent="SimplePipeline">
+        <property name="id" value="idem2edugain-metadata-sha1"/>
+        <property name="stages">
+            <list>
+                <ref bean="it_idem_idem2edugain_Entities"/>
+                <ref bean="standardImportActions"/>
+                <ref bean="it_idem_import_idem2edugain_tail"/>
+                <ref bean="it_idem_add_pub_info"/>
+                <ref bean="stripUkfedlabelNamespace"/>
+                <ref bean="stripWayfNamespace"/>
+                <ref bean="it_idem_sign_sha1" />
+                <ref bean="it_idem_serialize_idem2edugain_sha1"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="idem2edugain-metadata-sha256" parent="SimplePipeline">
+        <property name="id" value="idem2edugain-metadata-sha256"/>
+        <property name="stages">
+            <list>
+                <ref bean="it_idem_idem2edugain_Entities"/>
+                <ref bean="standardImportActions"/>
+                <ref bean="it_idem_import_idem2edugain_tail"/>
+                <ref bean="it_idem_add_pub_info"/>
+                <ref bean="stripUkfedlabelNamespace"/>
+                <ref bean="stripWayfNamespace"/>
+                <ref bean="it_idem_sign_sha256" />
+                <ref bean="it_idem_serialize_idem2edugain_sha256"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="edugain2idem-check" parent="SimplePipeline">
+        <property name="id" value="edugain2idem-check"/>
+        <property name="stages">
+            <list>
+                <ref bean="it_idem_edugain2idem_entities"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="edugain2idem-metadata" parent="SimplePipeline">
+        <property name="id" value="edugain2idem-metadata"/>
+        <property name="stages">
+            <list>
+                <ref bean="it_idem_edugain2idem_entities"/>
+                <ref bean="it_idem_import_edugain2idem_tail"/>
+                <ref bean="it_idem_add_trust_roots"/>
+                <ref bean="stripUkfedlabelNamespace"/>
+                <ref bean="stripWayfNamespace"/>
+                <ref bean="it_idem_serialize_edugain2idem_unsigned"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="edugain2idem-metadata-sha1" parent="SimplePipeline">
+        <property name="id" value="edugain2idem-metadata-sha1"/>
+        <property name="stages">
+            <list>
+                <ref bean="it_idem_edugain2idem_entities"/>
+                <ref bean="it_idem_import_edugain2idem_tail"/>
+                <ref bean="it_idem_add_trust_roots"/>
+                <ref bean="stripUkfedlabelNamespace"/>
+                <ref bean="stripWayfNamespace"/>
+                <ref bean="it_idem_sign_sha1" />
+                <ref bean="it_idem_serialize_edugain2idem_signed_sha1"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="edugain2idem-metadata-sha256" parent="SimplePipeline">
+        <property name="id" value="edugain2idem-metadata-sha256"/>
+        <property name="stages">
+            <list>
+                <ref bean="it_idem_edugain2idem_entities"/>
+                <ref bean="it_idem_import_edugain2idem_tail"/>
+                <ref bean="it_idem_add_trust_roots"/>
+                <ref bean="stripUkfedlabelNamespace"/>
+                <ref bean="stripWayfNamespace"/>
+                <ref bean="it_idem_sign_sha256" />
+                <ref bean="it_idem_serialize_edugain2idem_signed_sha256"/>
+            </list>
+        </property>
+    </bean>
+
+</beans>

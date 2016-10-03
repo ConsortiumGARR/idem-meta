@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<EntitiesDescriptor
+	xmlns="urn:oasis:names:tc:SAML:2.0:metadata"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:shibmd="urn:mace:shibboleth:metadata:1.0"
+	xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+	Name="http://ukfederation.org.uk"
+	xsi:schemaLocation="urn:oasis:names:tc:SAML:2.0:metadata ../../xml/saml-schema-metadata-2.0.xsd
+		urn:mace:shibboleth:metadata:1.0 ../../xml/shibboleth-metadata-1.0.xsd
+		http://www.w3.org/2001/04/xmlenc# ../../xml/xenc-schema.xsd
+		http://www.w3.org/2000/09/xmldsig# ../../xml/xmldsig-core-schema.xsd">
+   <Extensions>
+      <shibmd:KeyAuthority VerifyDepth="2">
+         <ds:KeyInfo>
+            <!-- TERENA SSL CA - Expiration: 30 May 2020 -->
+            <ds:X509Data>
+               <ds:X509Certificate>MIIEmDCCA4CgAwIBAgIQS8gUAy8H+mqk8Nop32F5ujANBgkqhkiG9w0BAQUFADCBlzELMAkGA1UEBhMCVVMxCzAJBgNVBAgTAlVUMRcwFQYDVQQHEw5TYWx0IExha2UgQ2l0eTEeMBwGA1UEChMVVGhlIFVTRVJUUlVTVCBOZXR3b3JrMSEwHwYDVQQLExhodHRwOi8vd3d3LnVzZXJ0cnVzdC5jb20xHzAdBgNVBAMTFlVUTi1VU0VSRmlyc3QtSGFyZHdhcmUwHhcNMDkwNTE4MDAwMDAwWhcNMjAwNTMwMTA0ODM4WjA2MQswCQYDVQQGEwJOTDEPMA0GA1UEChMGVEVSRU5BMRYwFAYDVQQDEw1URVJFTkEgU1NMIENBMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAw+NIxC9cwcupmf0booNdij2tOtDipEMfTQ7+NSUwpWkbxOjlwY9UfuFqoppcXN49/ALOlrhfj4NbzGBAkPjktjolnF8UUeyx56+eUKExVccCvaxSin81joL6hK0V/qJ/gxA6VVOULAEWdJRUYyij8lspPZSIgCDiFFkhGbSkmOFg5vLrooCDQ+CtaPN5GYtoQ1E/iptBhQw1jF218bblp8ODtWsjb9Sl61DllPFKX+4nSxQSFSRMDc9ijbcAIa06Mg9YC18em9HfnY6pGTVQL0GprTvG4EWyUzl/Ib8iGodcNK5Sbwd9ogtOnyt5pn0T3fV/g3wvWl13eHiRoBS/fQIDAQABo4IBPjCCATowHwYDVR0jBBgwFoAUoXJfJhsomEOVXQc31YWWnUvSw0UwHQYDVR0OBBYEFAy9k2gM896ro0lrKzdXR+qQ47ntMA4GA1UdDwEB/wQEAwIBBjASBgNVHRMBAf8ECDAGAQH/AgEAMBgGA1UdIAQRMA8wDQYLKwYBBAGyMQECAh0wRAYDVR0fBD0wOzA5oDegNYYzaHR0cDovL2NybC51c2VydHJ1c3QuY29tL1VUTi1VU0VSRmlyc3QtSGFyZHdhcmUuY3JsMHQGCCsGAQUFBwEBBGgwZjA9BggrBgEFBQcwAoYxaHR0cDovL2NydC51c2VydHJ1c3QuY29tL1VUTkFkZFRydXN0U2VydmVyX0NBLmNydDAlBggrBgEFBQcwAYYZaHR0cDovL29jc3AudXNlcnRydXN0LmNvbTANBgkqhkiG9w0BAQUFAAOCAQEATiPuSJz2hYtxxApuc5NywDqOgIrZs8qy1AGcKM/yXA4hRJMLthoh45gBlA5nSYEevj0NTmDa76AxTpXv8916WoIgQ7ahY0OzUGlDYktWYrA0irkTQ1mT7BR5iPNIk+idyfqHcgxrVqDDFY1opYcfcS3mWm08aXFABFXcoEOUIEU4eNe9itg5xt8Jt1qaqQO4KBB4zb8BG1oRPjj02Bs0ec8z0gH9rJjNbUcRkEy7uVvYcOfVr7bMxIbmdcCeKbYrDyqlaQIN4+mitF3A884saoU4dmHGSYKrUbOCprlBmCiY+2v+ihb/MX5UR6g83EMmqZsFt57ANEORMNQywxFa4Q==</ds:X509Certificate>
+            </ds:X509Data>
+         </ds:KeyInfo>
+         <ds:KeyInfo>
+            <!-- UTN-USERFirst-Hardware - Expiration: 30 May 2020 -->
+            <ds:X509Data>
+               <ds:X509Certificate>MIIEPDCCAySgAwIBAgIQSEus8arH1xND0aJ0NUmXJTANBgkqhkiG9w0BAQUFADBvMQswCQYDVQQGEwJTRTEUMBIGA1UEChMLQWRkVHJ1c3QgQUIxJjAkBgNVBAsTHUFkZFRydXN0IEV4dGVybmFsIFRUUCBOZXR3b3JrMSIwIAYDVQQDExlBZGRUcnVzdCBFeHRlcm5hbCBDQSBSb290MB4XDTA1MDYwNzA4MDkxMFoXDTIwMDUzMDEwNDgzOFowgZcxCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJVVDEXMBUGA1UEBxMOU2FsdCBMYWtlIENpdHkxHjAcBgNVBAoTFVRoZSBVU0VSVFJVU1QgTmV0d29yazEhMB8GA1UECxMYaHR0cDovL3d3dy51c2VydHJ1c3QuY29tMR8wHQYDVQQDExZVVE4tVVNFUkZpcnN0LUhhcmR3YXJlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsffDOD+0qH/POYJRZ9Btn9L/WPPnnyvsDYlUmbk4mRb34CF5SMK7YXQSlh08anLVPBBnOjntKxPNZuuVCTOkbJex6MbswXV5nEZejavQav25KlUXEFSzGfCa9vGxXbanbfvgcRdrooj7AN/+GjF3DJoBerEy4ysBBzhuw6VeI7xFm3tQwckwj9vlK3rTW/szQB6g1ZgXvIuHw4nTXaCOsqqq9o5piAbF+okh8widaS4JM5spDUYPjMxJNLBpUb35Bs1orWZMvD6sYb0KiA7I3z3ufARMnQpea5HW7sftKI2rTYeJc9BupNAeFosU4XZEA39jrOTNSZzFkvSrMqFIWwIDAQABo4GqMIGnMB8GA1UdIwQYMBaAFK29mHo0tCb3+sQmVO8DveAky1QaMB0GA1UdDgQWBBShcl8mGyiYQ5VdBzfVhZadS9LDRTAOBgNVHQ8BAf8EBAMCAQYwDwYDVR0TAQH/BAUwAwEB/zBEBgNVHR8EPTA7MDmgN6A1hjNodHRwOi8vY3JsLnVzZXJ0cnVzdC5jb20vQWRkVHJ1c3RFeHRlcm5hbENBUm9vdC5jcmwwDQYJKoZIhvcNAQEFBQADggEBADzse+Cuow6WbTDXhcbSaFtFWoKmNA+wyZIjXhFtCBGydAkjOjUlc1heyrl8KPpH7PmgA1hQtlPvjNs55Gfp2MooRtSn4PU4dfjny1y/HRE8akCbLURW0/f/BSgyDBXIZEWT6CEkjy3aeoR7T8/NsiV8dxDTlNEEkaglHAkiD31ENREU768A/l7qX46w2ZJZuvwTlqAYAVbO2vYoC7Gv3VxPXLLzj1pxz+0YrWOIHY6V9+qV5x+tkLiECEeFfyIvGh1IMNZMCNg3GWcyK+tc0LL8blefBDVekAB+EcfeEyrNpG1FJseIVqDwavfY5/wnfmcI0L36tsNhAgFlubgvz1o=</ds:X509Certificate>
+            </ds:X509Data>
+         </ds:KeyInfo>
+         <ds:KeyInfo>
+            <!-- AddTrust External CA Root - Expiration: 30 May 2020 -->
+            <ds:X509Data>
+               <ds:X509Certificate>MIIENjCCAx6gAwIBAgIBATANBgkqhkiG9w0BAQUFADBvMQswCQYDVQQGEwJTRTEUMBIGA1UEChMLQWRkVHJ1c3QgQUIxJjAkBgNVBAsTHUFkZFRydXN0IEV4dGVybmFsIFRUUCBOZXR3b3JrMSIwIAYDVQQDExlBZGRUcnVzdCBFeHRlcm5hbCBDQSBSb290MB4XDTAwMDUzMDEwNDgzOFoXDTIwMDUzMDEwNDgzOFowbzELMAkGA1UEBhMCU0UxFDASBgNVBAoTC0FkZFRydXN0IEFCMSYwJAYDVQQLEx1BZGRUcnVzdCBFeHRlcm5hbCBUVFAgTmV0d29yazEiMCAGA1UEAxMZQWRkVHJ1c3QgRXh0ZXJuYWwgQ0EgUm9vdDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALf3GjPm8gAELTngTlvtH7xsD821+iO2zt6bETOXpClMfZOfvUq8k+0DGuOPz+VtUFrWlymUWoCwSXrbLpX9uMq/NzgtHj6RQa1wVsfwTz/oMp50ysiQVOnGXw94nZpAPA6sYapeFI+eh6FqUNzXmk6vBbOmcZSccbNQYArHE504B4YCqOmoaSYYkKtMsE8jqzpPhNjfzp/haW+710LXa0Tkx63ubUFfclpxCDezeWWkWaCUN/cALw3CknLa0Dhy2xSoRcRdKn23tNbE7qzNE0S3ySvdQwAl+mG5aWpYIxG3pzOPVnVZ9c0p10a3CitlttNCbxWyuHv77+ldU9U0WicCAwEAAaOB3DCB2TAdBgNVHQ4EFgQUrb2YejS0Jvf6xCZU7wO94CTLVBowCwYDVR0PBAQDAgEGMA8GA1UdEwEB/wQFMAMBAf8wgZkGA1UdIwSBkTCBjoAUrb2YejS0Jvf6xCZU7wO94CTLVBqhc6RxMG8xCzAJBgNVBAYTAlNFMRQwEgYDVQQKEwtBZGRUcnVzdCBBQjEmMCQGA1UECxMdQWRkVHJ1c3QgRXh0ZXJuYWwgVFRQIE5ldHdvcmsxIjAgBgNVBAMTGUFkZFRydXN0IEV4dGVybmFsIENBIFJvb3SCAQEwDQYJKoZIhvcNAQEFBQADggEBALCb4IUlwtYj4g+WBpKdQZic2YR5gdkeWxQHIzZlj7DYd7usQWxHYINRsPkyPef89iYTx4AWpb9a/IfPeHmJIZriTAcKhjW88t5RxNKWt9x+Tu5w/Rw56wwCURQtjr0W4MHfRnXnJK3s9EK0hZNwEGe6nQY1ShjTK3rMUUKhemPR5ruhxSvCNr4TDea9Y355e6cJDUCrat2PisP29owaQgVR1EX1n6diIWgVIEM8med8vSTYqZEXc4g/VhsxOBi0cQ+azcgOno4uG+GMmIPLHzHxREzGBHNJdmAPx/i9F4BrLunMTA5amnkPIAou1Z5jJh5VkpTYghdae9C8x49OhgQ=</ds:X509Certificate>
+            </ds:X509Data>
+         </ds:KeyInfo>
+      </shibmd:KeyAuthority>
+   </Extensions>
+	
+	<EntityDescriptor entityID="dummy">
+		<!--
+			Dummy entity, present simply because the schema for EntitiesDescriptor
+			requires at least one.  Removed by applications that read this file.
+			
+			*** DO NOT REMOVE THIS ENTITY FROM THE MASTER FILE ***
+		-->
+		<SPSSODescriptor protocolSupportEnumeration="dummy">
+			<AssertionConsumerService index="0" Binding="dummy" Location="dummy"/>
+		</SPSSODescriptor>
+	</EntityDescriptor>
+	
+</EntitiesDescriptor>
+

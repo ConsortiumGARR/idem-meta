@@ -1,0 +1,599 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Common beans for this channel.
+-->
+<beans xmlns="http://www.springframework.org/schema/beans"
+    default-lazy-init="true"
+    xmlns:c="http://www.springframework.org/schema/c"
+    xmlns:p="http://www.springframework.org/schema/p"
+    xmlns:util="http://www.springframework.org/schema/util"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+        http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
+
+    <!--
+        Import commonly used beans.
+    -->
+    <import resource="classpath:common-beans.xml"/>
+
+    <!--
+        Import beans from other channels.
+    -->
+    <import resource="classpath:int_edugain/beans.xml"/>    
+
+    <!--
+        Location of various resources.
+    -->
+    <bean id="it_idem_test_url" class="java.lang.String">
+        <constructor-arg value="http://www.garr.it/idem-metadata/idem-test-metadata-sha256.xml"/>
+    </bean>
+
+    <bean id="it_idem_production_url" class="java.lang.String">
+        <constructor-arg value="http://www.garr.it/idem-metadata/idem-metadata-sha256.xml"/>
+    </bean>
+
+    <bean id="it_idem_edugain2idem_url" class="java.lang.String">
+        <constructor-arg value="http://www.garr.it/idem-metadata/edugain2idem-metadata-sha256.xml"/> 
+    </bean>
+
+    <bean id="it_idem_idem2edugain_url" class="java.lang.String">
+        <constructor-arg value="http://www.garr.it/idem-metadata/idem2edugain-metadata-sha256.xml"/> 
+    </bean>
+
+    <!--
+        Fetch aggregates from URLs.
+    -->
+    <bean id="it_idem_test_aggregate" parent="DOMResourceSourceStage">
+        <property name="id" value="it_idem_test_aggregate"/>
+        <property name="DOMResource">
+            <bean parent="HTTPResource">
+                <constructor-arg name="client" ref="httpClient"/>
+                <constructor-arg name="url"    ref="it_idem_test_url"/>
+            </bean>
+        </property>
+    </bean>
+
+    <bean id="it_idem_prod_aggregate" parent="DOMResourceSourceStage">
+        <property name="id" value="it_idem_prod_aggregate"/>
+        <property name="DOMResource">
+            <bean parent="HTTPResource">
+                <constructor-arg name="client" ref="httpClient"/>
+                <constructor-arg name="url"    ref="it_idem_production_url"/>
+            </bean>
+        </property>
+    </bean>
+
+    <bean id="it_idem_edugain2idem_aggregate" parent="DOMResourceSourceStage">
+        <property name="id" value="it_idem_edugain2idem_aggregate"/>
+        <property name="DOMResource">
+            <bean parent="HTTPResource">
+                <constructor-arg name="client" ref="httpClient"/>
+                <constructor-arg name="url"    ref="it_idem_edugain2idem_url"/>
+            </bean>
+        </property>
+    </bean>
+ 
+    <bean id="it_idem_idem2edugain_aggregate" parent="DOMResourceSourceStage">
+        <property name="id" value="it_idem_idem2edugain_aggregate"/>
+        <property name="DOMResource">
+            <bean parent="HTTPResource">
+                <constructor-arg name="client" ref="httpClient"/>
+                <constructor-arg name="url"    ref="it_idem_idem2edugain_url"/>
+            </bean>
+        </property>
+    </bean>
+   
+    <!-- XSL Stylesheet for IDEM Metadata - Test & Prod Federation
+    <bean id="it_idem_metadataXSL" class="net.shibboleth.utilities.java.support.resource.FilesystemResource">
+        <constructor-arg value="${mdx.dir}/it_idem/xsl/IDEM.xsl" />
+    </bean>
+    -->
+
+    <!-- Stage used to format the metadata XML with the XSL stylesheet "IDEM.xsl" provided by "it_idem_metadataXSL" above
+    <bean id="it_idem_formatMetadata" class="net.shibboleth.metadata.dom.MultiOutputXSLTransformationStage">
+        <property name="id" value="it_idem_formatMetadata"/>
+        <property name="XSLResource" ref="it_idem_metadataXSL"/>
+    </bean>
+    -->
+
+    <!-- Stage that retrieves the IDEM Production metadata from the directory "${mdx.dir/it_idem/md-in/idem-prod" -->
+
+    <bean id="it_idem_dir_prod_metadata" class="net.shibboleth.metadata.dom.DOMFilesystemSourceStage" parent="stage_parent">
+        <property name="id" value="it_idem_dir_prod_metadata"/>
+        <property name="parserPool">
+            <bean class="net.shibboleth.utilities.java.support.xml.BasicParserPool" init-method="initialize"/>
+        </property>
+        <property name="source">
+            <bean class="java.io.File">
+                <constructor-arg value="${mdx.dir}/it_idem/md-in/idem-prod"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- Stage that retrieves the IDEM Test metadata from the directory "${mdx.dir}/it_idem/md-in/idem-test" -->
+
+    <bean id="it_idem_dir_test_metadata" class="net.shibboleth.metadata.dom.DOMFilesystemSourceStage" parent="stage_parent">
+        <property name="id" value="it_idem_dir_test_metadata"/>
+        <property name="parserPool">
+            <bean class="net.shibboleth.utilities.java.support.xml.BasicParserPool" init-method="initialize"/>
+        </property>
+        <property name="source">
+            <bean class="java.io.File">
+                <constructor-arg value="${mdx.dir}/it_idem/md-in/idem-test"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- Stage that retrieves the IDEM idem2edugain metadata from the directory "${mdx.dir}/it_idem/md-in/idem2edugain" -->
+
+    <bean id="it_idem_dir_idem2edugain_metadata" class="net.shibboleth.metadata.dom.DOMFilesystemSourceStage" parent="stage_parent">
+        <property name="id" value="it_idem_dir_idem2edugain_metadata"/>
+        <property name="parserPool">
+            <bean class="net.shibboleth.utilities.java.support.xml.BasicParserPool" init-method="initialize"/>
+        </property>
+        <property name="source">
+            <bean class="java.io.File">
+                <constructor-arg value="${mdx.dir}/it_idem/md-in/idem2edugain"/>
+            </bean>
+        </property>
+    </bean>
+
+
+    <!-- Stage that contains the IDEM Metadata Signer Certificate and the Key -->
+    <bean id="it_idem_sign_key" class="org.springframework.core.io.FileSystemResource">
+        <constructor-arg value="${credentials.dir}/idem-metadata-signer.key"/>
+    </bean>
+
+    <bean id="it_idem_sign_cert" class="org.springframework.core.io.FileSystemResource">
+        <constructor-arg value="${credentials.dir}/idem-metadata-signer.crt"/>
+    </bean>
+
+    <!-- Stage used to sign metadata with the SHA256 Algorithm -->
+    <bean id="it_idem_sign_sha256" class="net.shibboleth.metadata.dom.XMLSignatureSigningStage">
+        <property name="id" value="it_idem_sign_sha256"/>
+        <property name="privateKey">
+            <bean class="net.shibboleth.ext.spring.factory.PrivateKeyFactoryBean">
+                <property name="resource">
+                    <ref bean="it_idem_sign_key" />
+                </property>
+            </bean>
+        </property>
+
+        <property name="c14nWithComments" value="true" />
+        <property name="includeX509Certificates" value="true" />
+
+        <property name="certificates">
+            <list>
+                <bean class="net.shibboleth.ext.spring.factory.X509CertificateFactoryBean">
+                    <property name="resource">
+                        <ref bean="it_idem_sign_cert"/>
+                    </property>
+                </bean>
+         </list>
+       </property>
+       <property name="shaVariant">
+           <util:constant static-field="net.shibboleth.metadata.dom.XMLSignatureSigningStage.ShaVariant.SHA256"/>
+       </property>
+    </bean>
+
+    <!-- Stage used to sign metadata with the SHA1 Algorithm -->
+    <bean id="it_idem_sign_sha1" class="net.shibboleth.metadata.dom.XMLSignatureSigningStage">
+        <property name="id" value="it_idem_sign_sha1"/>
+        <property name="privateKey">
+            <bean class="net.shibboleth.ext.spring.factory.PrivateKeyFactoryBean">
+                <property name="resource">
+                    <ref bean="it_idem_sign_key" />
+                </property>
+            </bean>
+        </property>
+
+        <property name="c14nWithComments" value="true" />
+        <property name="includeX509Certificates" value="true" />
+
+        <property name="certificates">
+            <list>
+                <bean class="net.shibboleth.ext.spring.factory.X509CertificateFactoryBean">
+                    <property name="resource">
+                        <ref bean="it_idem_sign_cert"/>
+                    </property>
+                </bean>
+         </list>
+       </property>
+       <property name="shaVariant">
+           <util:constant static-field="net.shibboleth.metadata.dom.XMLSignatureSigningStage.ShaVariant.SHA1"/>
+       </property>
+    </bean>
+
+    <!--
+      The following stages add the ID attribute and the Reference URI to the <EntitiesDescriptor>.
+      Their values will contain the time of creation of metadata into UTC format.
+    -->
+
+    <!-- XSL Stylesheet to change the ID and Reference URI on EntitiesDescriptor of IDEM Test & Prod Federation -->
+    <bean id="xslTransformationAddRootIDAttribute" class="java.lang.String">
+        <constructor-arg value="${mdx.dir}/it_idem/xsl/add-root-id-attribute.xsl" />
+    </bean>
+
+  
+    <!-- IDEM Production Prefix -->
+    <bean id="it_idem_prod_prefix" class="java.lang.String">
+      <constructor-arg value="IDEM"/>
+    </bean>
+
+    <bean id="it_idem_add_ID_to_prod" parent="stage_parent" class="net.shibboleth.metadata.dom.XSLTransformationStage">
+      <property name="id" value="it_idem_add_ID_to_prod"/>
+      <property name="XSLResource">
+         <bean parent="FileSystemResource">
+               <constructor-arg ref="xslTransformationAddRootIDAttribute" />
+         </bean>
+      </property>
+      <property name="transformParameters">
+         <map>
+              <entry key="prefix" value-ref="it_idem_prod_prefix"/>
+         </map>
+      </property>
+    </bean>
+
+    <!-- IDEM Test Prefix -->
+    <bean id="it_idem_test_prefix" class="java.lang.String">
+      <constructor-arg value="IDEM-TEST"/>
+    </bean>
+
+    <bean id="it_idem_add_id_to_test" parent="stage_parent" class="net.shibboleth.metadata.dom.XSLTransformationStage">
+      <property name="id" value="it_idem_add_id_to_test"/>
+      <property name="XSLResource">
+         <bean parent="FileSystemResource">
+               <constructor-arg ref="xslTransformationAddRootIDAttribute" />
+         </bean>
+      </property>
+      <property name="transformParameters">
+         <map>
+              <entry key="prefix" value-ref="it_idem_test_prefix"/>
+         </map>
+      </property>
+    </bean>
+
+    <!-- idem2edugain Prefix -->
+    <bean id="it_idem_idem2edugain_prefix" class="java.lang.String">
+      <constructor-arg value="IDEM-EDUGAIN"/>
+    </bean>
+
+    <bean id="it_idem_add_id_to_idem2edugain" parent="stage_parent" class="net.shibboleth.metadata.dom.XSLTransformationStage">
+      <property name="id" value="it_idem_add_id_to_idem2edugain"/>
+      <property name="XSLResource">
+         <bean parent="FileSystemResource">
+               <constructor-arg ref="xslTransformationAddRootIDAttribute" />
+         </bean>
+      </property>
+      <property name="transformParameters">
+         <map>
+              <entry key="prefix" value-ref="it_idem_idem2edugain_prefix"/>
+         </map>
+      </property>
+    </bean>
+
+    <!-- edugain2idem prefix -->
+    <bean id="it_idem_edugain2idem_prefix" class="java.lang.String">
+      <constructor-arg value="EDUGAIN-IDEM"/>
+    </bean>
+
+    <bean id="it_idem_add_id_to_edugain2idem" parent="stage_parent" class="net.shibboleth.metadata.dom.XSLTransformationStage">
+      <property name="id" value="it_idem_add_id_to_edugain2idem"/>
+      <property name="XSLResource">
+         <bean parent="FileSystemResource">
+               <constructor-arg ref="xslTransformationAddRootIDAttribute" />
+         </bean>
+      </property>
+      <property name="transformParameters">
+         <map>
+              <entry key="prefix" value-ref="it_idem_edugain2idem_prefix"/>
+         </map>
+      </property>
+    </bean>
+
+    <!-- IDEM registrationAuthority URI -->
+    <bean id="it_idem_reg_auth_uri" class="java.lang.String">
+       <constructor-arg value="http://www.idem.garr.it/"/>
+    </bean>
+
+    <!-- Stage used to add the PublicationInfo part mandatory for eduGAIN interfederation -->
+    <bean id="it_idem_add_pub_info" parent="stage_parent" class="net.shibboleth.metadata.dom.XSLTransformationStage">
+      <property name="id" value="it_idem_add_pub_info"/>
+      <property name="XSLResource">
+          <bean parent="ClassPathResource">
+              <constructor-arg value="it_idem/xsl/idemAddPubInfo.xsl"/>
+          </bean>
+      </property>
+      <property name="transformParameters">
+          <map>
+              <entry key="publisher" value-ref="it_idem_reg_auth_uri"/>
+          </map>
+      </property>
+    </bean>
+
+    <!--
+        it_idem_trust_roots
+        
+        This bean contains the contents of the trust roots file as a DOM Document.
+    -->
+    <bean id="it_idem_trust_roots" class="net.shibboleth.ext.spring.factory.DOMDocumentFactoryBean">
+        <property name="parserPool" ref="parserPool"/>
+        <property name="resource">
+            <bean parent="FileSystemResource">
+                <constructor-arg value="${mdx.dir}/it_idem/trust-roots.xml"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!--
+       it_idem_add_trust_roots
+       
+       This stage adds the IDEM federation trust roots to an EntitiesDescriptor.
+    -->
+    <bean id="it_idem_add_trust_roots" parent="XSLTransformationStage">
+       <property name="id" value="it_idem_add_trust_roots"/>
+       <property name="XSLResource">
+           <bean parent="ClassPathResource">
+               <constructor-arg value="it_idem/trust-roots.xsl"/>
+           </bean>
+       </property>
+       <property name="transformParameters">
+           <map>
+               <entry key="trustRootsDocument" value-ref="it_idem_trust_roots"/>
+           </map>
+       </property>
+    </bean>
+
+    <!-- Stage used to assemble the <EntitiesDescriptor> with all entities and add the Name="urn:mace:garr.it:idem" at the IDEM Production Metadata -->
+    <bean id="it_idem_prod_assemble" parent="stage_parent" class="net.shibboleth.metadata.dom.saml.EntitiesDescriptorAssemblerStage">
+        <property name="id" value="it_idem_prod_assemble"/>
+        <property name="descriptorName" value="urn:mace:garr.it:idem"/>
+    </bean>
+
+    <!-- Stage used to assemble the <EntitiesDescriptor> with all entities and add the Name="urn:mace:garr.it:idem-test" at the IDEM Test Metadata -->
+    <bean id="it_idem_test_assemble" parent="stage_parent" class="net.shibboleth.metadata.dom.saml.EntitiesDescriptorAssemblerStage">
+        <property name="id" value="it_idem_test_assemble"/>
+        <property name="descriptorName" value="urn:mace:garr.it:idem-test"/>
+    </bean>
+
+    <!-- Stage used to assemble the <EntitiesDescriptor> with all entities and add the Name="urn:mace:garr.it:idem-edugain" at the IDEM idem2edugain Metadata -->
+    <bean id="it_idem_idem2edugain_assemble" parent="stage_parent" class="net.shibboleth.metadata.dom.saml.EntitiesDescriptorAssemblerStage">
+        <property name="id" value="it_idem_idem2edugain_assemble"/>
+        <property name="descriptorName" value="urn:mace:garr.it:idem-edugain"/>
+    </bean>
+
+    <!-- Stage used to assemble the <EntitiesDescriptor> with all entities and add the Name="urn:mace:garr.it:idem-edugain" at the IDEM edugain2idem Metadata -->
+    <bean id="it_idem_edugain2idem_assemble" parent="stage_parent" class="net.shibboleth.metadata.dom.saml.EntitiesDescriptorAssemblerStage">
+        <property name="id" value="it_idem_edugain2idem_assemble"/>
+        <property name="descriptorName" value="urn:mace:garr.it:edugain-idem"/>
+    </bean>
+
+
+    <!-- Stage used to add the validUntil duration (5 days) to the IDEM Prod Metadata -->
+    <bean id="it_idem_add_valid_until_to_prod" parent="stage_parent" class="net.shibboleth.metadata.dom.saml.SetValidUntilStage">
+        <property name="id" value="it_idem_add_valid_until_to_prod"/> 
+        <property name="validityDuration" value="#{1000L * 60 * 60 * 24 * 5}"/>
+    </bean>
+
+    <!-- Stage used to add the validUntil duration (5 days) to the IDEM Test Metadata -->
+    <bean id="it_idem_add_valid_until_to_test" parent="stage_parent" class="net.shibboleth.metadata.dom.saml.SetValidUntilStage">
+       <property name="id" value="it_idem_add_valid_until_to_test"/>
+       <property name="validityDuration" value="#{1000L * 60 * 60 * 24 * 5}"/>
+    </bean>
+
+    <!-- Stage used to add the validUntil duration (5 days) to the IDEM idem2edugain Metadata -->
+    <bean id="it_idem_add_valid_until_to_idem2edugain" parent="stage_parent" class="net.shibboleth.metadata.dom.saml.SetValidUntilStage">
+       <property name="id" value="it_idem_add_valid_until_to_idem2edugain"/>
+       <property name="validityDuration" value="#{1000L * 60 * 60 * 24 * 5}"/>
+    </bean>
+
+   <!--
+        it_idem_import_XXX_tail
+        
+        Stage where will be run the following final steps:
+        - Assemble all items into only one
+        - Add 'ID' and 'Reference URI' to the <EntitiesDescriptor>
+        - Add 'validUntil' to the <EntitiesDescriptor>
+        - Normalize Namespaces
+
+        Stage useful to prepare the document to the serialization
+    -->
+    <bean id="it_idem_import_prod_tail" parent="CompositeStage">
+        <property name="id" value="it_idem_import_prod_tail"/>
+        <property name="composedStages">
+            <list>
+                <!-- announce and remove any entities with errors -->
+                <!--<ref bean="errorAnnouncingFilter"/>-->
+                <ref bean="it_idem_prod_assemble"/>
+                <ref bean="it_idem_add_ID_to_prod"/>
+                <ref bean="it_idem_add_valid_until_to_prod"/>
+                <ref bean="normaliseNamespaces"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="it_idem_import_test_tail" parent="CompositeStage">
+        <property name="id" value="it_idem_import_test_tail"/>
+        <property name="composedStages">
+            <list>
+                <!-- announce and remove any entities with errors -->
+                <!--<ref bean="errorAnnouncingFilter"/>-->
+                <ref bean="it_idem_test_assemble"/>
+                <ref bean="it_idem_add_id_to_test"/>
+                <ref bean="it_idem_add_valid_until_to_test"/>
+                <ref bean="normaliseNamespaces"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="it_idem_import_idem2edugain_tail" parent="CompositeStage">
+        <property name="id" value="it_idem_import_idem2edugain_tail"/>
+        <property name="composedStages">
+            <list>
+                <!-- announce and remove any entities with errors -->
+                <!--<ref bean="errorAnnouncingFilter"/>-->
+                <ref bean="it_idem_idem2edugain_assemble"/>
+                <ref bean="it_idem_add_id_to_idem2edugain"/>
+                <ref bean="it_idem_add_valid_until_to_idem2edugain"/>
+                <ref bean="normaliseNamespaces"/>
+            </list>
+        </property>
+    </bean>
+
+    <bean id="it_idem_import_edugain2idem_tail" parent="CompositeStage">
+        <property name="id" value="it_idem_import_edugain2idem_tail"/>
+        <property name="composedStages">
+            <list>
+                <!-- announce and remove any entities with errors -->
+                <!--<ref bean="errorAnnouncingFilter"/>-->
+                <ref bean="it_idem_edugain2idem_assemble"/>
+                <ref bean="it_idem_add_id_to_edugain2idem"/>
+                <ref bean="it_idem_add_valid_until_to_idem2edugain"/>
+                <ref bean="normaliseNamespaces"/>
+            </list>
+        </property>
+    </bean>
+
+    <!--
+        Check IDEM signing signature.
+    -->
+    <bean id="it_idem_check_signature" parent="XMLSignatureValidationStage">
+        <property name="id" value="it_idem_check_signature"/>
+        <property name="verificationCertificate">
+            <bean class="net.shibboleth.ext.spring.factory.X509CertificateFactoryBean">
+                <property name="resource">
+                    <ref bean="it_idem_sign_cert"/>
+                </property>
+            </bean>
+        </property>
+        <property name="permittingEmptyReferences" value="true"/>
+    </bean>
+
+    <!-- Retrieve the IDEM Production entities like a collection of items -->
+    <bean id="it_idem_prod_entities" parent="CompositeStage">
+        <property name="id" value="it_idem_prod_entities"/>
+        <property name="composedStages">
+            <list>
+               <!-- Retrieve the entities from an URL -->
+               <!--<ref bean="it_idem_prod_aggregate"/>-->
+
+               <!-- Retrieve the entities from a directory -->
+               <ref bean="it_idem_dir_prod_metadata"/>
+               <!--
+                   Check for fatal errors at the aggregate level:
+                       missing or expired validUntil attribute
+                       invalid signature
+               -->
+               <ref bean="check_validUntil"/>
+               <ref bean="it_idem_check_signature"/>
+               <!-- Terminate the metadata generation if errors are found -->
+               <!--<ref bean="errorTerminatingFilter"/>-->
+
+               <ref bean="disassemble"/>
+            </list>
+        </property>
+    </bean>
+
+    <!-- Retrieve the IDEM Test entities like a collection of items -->
+    <bean id="it_idem_test_entities" parent="CompositeStage">
+        <property name="id" value="it_idem_test_entities"/>
+        <property name="composedStages">
+            <list>
+               <!-- Retrieve the entities from an URL -->
+               <ref bean="it_idem_test_aggregate"/>
+
+               <!-- Retrieve the entities from a directory -->
+               <!--<ref bean="it_idem_dir_test_metadata"/>-->
+               <!--
+                   Check for fatal errors at the aggregate level:
+                       missing or expired validUntil attribute
+                       invalid signature
+               -->
+               <ref bean="check_validUntil"/>
+               <ref bean="it_idem_check_signature"/>
+               <!--<ref bean="errorTerminatingFilter"/>-->
+
+               <ref bean="disassemble"/>
+            </list>
+        </property>
+    </bean>
+
+    <!-- Retrieve the IDEM edugain2idem entities (from an URL) like a collection of items
+    <bean id="it_idem_edugain2idem_entities_published" parent="CompositeStage">
+        <property name="id" value="it_idem_edugain2idem_entities_from_url"/>
+        <property name="composedStages">
+            <list>
+               <ref bean="it_idem_edugain2idem_aggregate"/>
+               <ref bean="check_validUntil"/>
+               <ref bean="it_idem_check_signature"/>
+               <ref bean="disassemble"/>
+            </list>
+        </property>
+    </bean>
+    -->
+
+    <!-- Retrieve the IDEM edugain2idem entities like a collection of items
+         by removing the already present IDEM entities from eduGAIN metadata stream -->
+    <bean id="it_idem_edugain2idem_entities" parent="PipelineMergeStage.deduplicate">
+          <property name="id" value="it_idem_edugain2idem_entities"/>
+          <property name="mergedPipelines">
+              <list>
+                  <ref bean="it_idem_prod_importPipeline"/>
+                  <ref bean="it_idem_edugain_importPipeline"/>
+              </list>
+          </property>
+    </bean>
+
+    <bean id="it_idem_prod_importPipeline" parent="SimplePipeline">
+          <property name="id" value="it_idem_prod_importPipeline"/>
+          <property name="stages">
+              <list>
+                  <ref bean="it_idem_prod_entities"/>
+                  <ref bean="standardImportActions"/>
+                  <ref bean="warningAndErrorAnnouncer"/>
+              </list>
+          </property>
+    </bean>
+
+    <!-- Usando le ricette di Ian (sicuramente migliori) vengono rimossi gli elementi con namespace pari a:
+         1) xmlns:ns9="urn:geant:niif.hu:eduid.hu:entity-attributes:processing-info"
+         2) xmlns:eduidmd="http://eduid.cz/schema/metadata/1.0"
+    -->
+
+    <bean id="it_idem_edugain_importPipeline" parent="SimplePipeline">
+          <property name="id" value="it_idem_edugain_importPipeline"/>
+          <property name="stages">
+              <list>
+                  <ref bean="int_edugain_productionEntities"/>
+                  <ref bean="standardImportActions"/>
+              </list>
+          </property>
+    </bean>
+
+    <!-- Retrieve the IDEM idem2edugain entities like a collection of items -->
+    <bean id="it_idem_idem2edugain_Entities" parent="CompositeStage">
+        <property name="id" value="it_idem_idem2edugain_Entities"/>
+        <property name="composedStages">
+            <list>
+               <!-- Retrieve the entities from an URL -->
+               <!--<ref bean="it_idem_prod_aggregate"/>-->
+
+               <!-- Retrieve the entities from a directory -->
+               <ref bean="it_idem_dir_idem2edugain_metadata"/>
+               <!--
+                   Check for fatal errors at the aggregate level:
+                       missing or expired validUntil attribute
+                       invalid signature
+               -->
+               <ref bean="check_validUntil"/>
+               <ref bean="it_idem_check_signature"/>
+               <!-- Terminate the metadata generation if errors are found -->
+               <!--<ref bean="errorTerminatingFilter"/>-->
+
+               <ref bean="disassemble"/>
+            </list>
+        </property>
+    </bean>
+
+</beans>

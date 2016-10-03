@@ -1,0 +1,28 @@
+# File di Configurazione per IDEM GARR AAI
+
+#
+# If we have a PKCS#11 configuration specified, include it.
+#
+#sign.idem.pkcs11Config =
+
+#
+# XMLSecTool "--keystore" parameter
+#
+sign.idem.keystore = /path/of/your/keystore.jks
+
+#
+# XMLSecTool "--keyFile" parameter
+#
+sign.idem.keyFile = alias-of-your-certificate
+#sign.idem.keyAlias =
+
+#
+# XMLSecTool "--certificate" parameter
+#
+#sign.idem.certificate =
+
+#
+# XMLSecTool "--keyPassword" parameter
+#
+sign.idem.keyPassword = password_of_your_keystore
+
