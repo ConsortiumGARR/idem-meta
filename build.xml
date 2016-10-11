@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <!--
-    Federation metadata signing process for the UK federation.
+    Federation metadata signing process for the IDEM federation.
 
     The following are among the callable targets for this process:
 
@@ -483,58 +483,7 @@
     </macrodef>
 
     <!--
-      Signs the unsigned aggregates
-    -->
-<!--
-    <target name="idem-sign-all" depends="get.sign.idem.keyPassword">
-        <echo>Signing unsigned aggregates.</echo>
-
-        <echo>Signing IDEM Test metadata.</echo>
-        <SIGN.idem i="${output.dir}/${idem.test.metadata.unsigned}" o="${output.dir}/${idem.test.metadata.signed}" digest="SHA-256"/>
-
-        <echo>Signing IDEM Production metadata.</echo>
-        <SIGN.idem i="${output.dir}/${idem.metadata.unsigned}" o="${output.dir}/${idem.metadata.signed}" digest="SHA-256"/>
-
-        <echo>Signing idem2edugain metadata.</echo>
-        <SIGN.idem i="${output.dir}/${idem2edugain.metadata.unsigned}" o="${output.dir}/${idem2edugain.metadata.signed}" digest="SHA-256"/>
-
-        <echo>Signing edugain2idem metadata.</echo>
-        <SIGN.idem i="${output.dir}/${edugain2idem.metadata.unsigned}" o="${output.dir}/${edugain2idem.metadata.signed}" digest="SHA-256"/>
-    </target>
-
-    <target name="idem-sign-test" depends="get.sign.idem.keyPassword">
-        <echo>Signing unsigned aggregates.</echo>
-
-        <echo>Signing IDEM Test metadata.</echo>
-        <SIGN.idem i="${output.dir}/${idem.test.metadata.unsigned}" o="${output.dir}/${idem.test.metadata.signed}" digest="SHA-256"/>
-    </target>
-
-    <target name="idem-sign-production" depends="get.sign.idem.keyPassword">
-        <echo>Signing unsigned aggregates.</echo>
-
-        <echo>Signing IDEM Production metadata.</echo>
-        <SIGN.idem i="${output.dir}/${idem.metadata.unsigned}" o="${output.dir}/${idem.metadata.signed}" digest="SHA-256"/>
-    </target>
-
-    <target name="idem-sign-idem2edugain" depends="get.sign.idem.keyPassword">
-        <echo>Signing unsigned aggregates.</echo>
-
-        <echo>Signing idem2edugain metadata.</echo>
-        <SIGN.idem i="${output.dir}/${idem2edugain.metadata.unsigned}" o="${output.dir}/${idem2edugain.metadata.signed}" digest="SHA-256"/>
-    </target>
-
-    <target name="idem-sign-edugain2idem" depends="get.sign.idem.keyPassword">
-        <echo>Signing unsigned aggregates.</echo>
-
-        <echo>Signing edugain2idem metadata.</echo>
-        <SIGN.idem i="${output.dir}/${edugain2idem.metadata.unsigned}" o="${output.dir}/${edugain2idem.metadata.signed}" digest="SHA-256"/>
-    </target>
--->
-    <!--
-        Verify UK federation metadata with both verification tools.
-
-        This should be used when the metadata needs to be compatible
-        with the Shibboleth 1.3 IdP.
+        Verify IDEM federation metadata with verification tool.
     -->
     <macrodef name="VFY.idem">
         <attribute name="i"/>
@@ -551,24 +500,40 @@
         Verify the signed aggregates.
     -->
     <target name="idem-verify">
-        <echo>Verification start...</echo>
+        <echo>Metadata Verification Signature start...</echo>
 
-        <echo>Verifying signed idem-test-metadata-sha256.</echo>
-        <VFY.idem i="${output.dir}/${idem.test.metadata.signed.sha1}"/>
+        <echo>Verifying signed idem-test-metadata-sha256...</echo>
         <VFY.idem i="${output.dir}/${idem.test.metadata.signed.sha256}"/>
-
-        <echo>Verifying signed idem-metadata-sha256.</echo>
-        <VFY.idem i="${output.dir}/${idem.metadata.signed.sha1}"/>
+        <echo>...idem-test-metadata-sha256 verified.</echo>
+<!--
+        <echo>Verifying signed idem-test-metadata-sha1...</echo>
+        <VFY.idem i="${output.dir}/${idem.test.metadata.signed.sha1}"/>
+        <echo>...idem-test-metadata-sha1 verified.</echo>
+-->
+        <echo>Verifying signed idem-metadata-sha256...</echo>
         <VFY.idem i="${output.dir}/${idem.metadata.signed.sha256}"/>
-
-        <echo>Verifying signed idem2edugain-metadata-sha256.</echo>
-        <VFY.idem i="${output.dir}/${idem2edugain.metadata.signed.sha1}"/>
+        <echo>...idem-metadata-sha256 verified.</echo>
+<!--
+        <echo>Verifying signed idem-metadata-sha1...</echo>
+        <VFY.idem i="${output.dir}/${idem.metadata.signed.sha1}"/>
+        <echo>...idem-metadata-sha1 verified.</echo>
+-->
+        <echo>Verifying signed idem2edugain-metadata-sha256...</echo>
         <VFY.idem i="${output.dir}/${idem2edugain.metadata.signed.sha256}"/>
-
-        <echo>Verifying signed edugain2idem-metadata-sha256.</echo>
-        <VFY.idem i="${output.dir}/${edugain2idem.metadata.signed.sha1}"/>
+        <echo>...idem2edugain-metadata-sha256 verified.</echo>
+<!--
+        <echo>Verifying signed idem2edugain-metadata-sha1...</echo>
+        <VFY.idem i="${output.dir}/${idem2edugain.metadata.signed.sha1}"/>
+        <echo>...idem2edugain-metadata-sha1 verified.</echo>
+-->
+        <echo>Verifying signed edugain2idem-metadata-sha256...</echo>
         <VFY.idem i="${output.dir}/${edugain2idem.metadata.signed.sha256}"/>
-
+        <echo>...edugain2idem-metadata-sha256 verified.</echo>
+<!--
+        <echo>Verifying signed edugain2idem-metadata-sha1...</echo>
+        <VFY.idem i="${output.dir}/${edugain2idem.metadata.signed.sha1}"/>
+        <echo>...edugain2idem-metadata-sha1 verified.</echo>
+-->
         <echo>...Verification completed.</echo>
     </target>
 
@@ -692,6 +657,8 @@
     <!-- UNSIGNED + SIGNED FLOWS -->
 
     <target name="idem-signed-test" depends="get.sign.idem.keyPassword">
+         <echo>Check IDEM Test metadata...</echo>
+         <CHANNEL.do channel="it_idem" verb="idem-test-check"/>
          <echo>Create IDEM Test metadata...</echo>
          <CHANNEL.do channel="it_idem" verb="idem-test-metadata"/>
          <echo>...done.</echo>
@@ -706,21 +673,23 @@
          <echo>...done.</echo>
 
          <echo>IDEM Test Metadata: Created.</echo>
-<!--
+
          <echo>Verify IDEM Test Metadata signature...</echo>
+<!--
          <echo>Verifying signed idem-test-metadata-sha1.</echo>
          <VFY.idem i="${output.dir}/${idem.test.metadata.signed.sha1}"/>
          <echo>...verified.</echo>
-         
+-->         
          <echo>Verifying signed idem-test-metadata-sha256.</echo>
          <VFY.idem i="${output.dir}/${idem.test.metadata.signed.sha256}"/>
          <echo>...verified.</echo>
 
          <echo>OK</echo>
--->
     </target>
 
     <target name="idem-signed-prod" depends="get.sign.idem.keyPassword">
+         <echo>Check IDEM Production metadata...</echo>
+         <CHANNEL.do channel="it_idem" verb="idem-prod-check"/>
          <echo>Create IDEM Production metadata...</echo>
          <CHANNEL.do channel="it_idem" verb="idem-metadata"/>
          <echo>...done.</echo>
@@ -735,21 +704,23 @@
          <echo>...done.</echo>
 
          <echo>IDEM Production Metadata: Created.</echo>
-<!--
+
          <echo>Verify IDEM Test Metadata signature...</echo>
+<!--
          <echo>   Verifying signed idem-metadata-sha1...</echo>
          <VFY.idem i="${output.dir}/${idem.metadata.signed.sha1}"/>
          <echo>...verified.</echo>
-
+-->
          <echo>   Verifying signed idem-metadata-sha256...</echo>
          <VFY.idem i="${output.dir}/${idem.metadata.signed.sha256}"/>
          <echo>...verified.</echo>
 
          <echo>OK</echo>
--->
    </target>
 
     <target name="idem-signed-idem2edugain" depends="get.sign.idem.keyPassword">
+         <echo>Check IDEM idem2edugain metadata...</echo>
+         <CHANNEL.do channel="it_idem" verb="idem2edugain-check"/>
          <echo>Create IDEM idem2edugain metadata...</echo>
          <CHANNEL.do channel="it_idem" verb="idem2edugain-metadata"/>
          <echo>...done.</echo>
@@ -764,18 +735,18 @@
          <echo>...done.</echo>
 
          <echo>IDEM idem2edugain Metadata: Created.</echo>
-<!--
+
          <echo>Verify IDEM idem2edugain signature...</echo>
+<!--
          <echo>   Verifying signed idem2edugain-metadata-sha1.</echo>
          <VFY.idem i="${output.dir}/${idem2edugain.metadata.signed.sha1}"/>
          <echo>...verified.</echo>
-
+-->
          <echo>   Verifying signed idem2edugain-metadata-sha256.</echo>
          <VFY.idem i="${output.dir}/${idem2edugain.metadata.signed.sha256}"/>
          <echo>...verified.</echo>
 
          <echo>OK</echo>
--->
     </target>
 
     <target name="idem-signed-edugain2idem" depends="get.sign.idem.keyPassword">
@@ -793,19 +764,18 @@
          <echo>...done.</echo>
 
          <echo>IDEM edugain2idem Metadata: Created.</echo>
-<!--
-         <echo>Verify IDEM edugain2idem signature...</echo>
 
+         <echo>Verify IDEM edugain2idem signature...</echo>
+<!--
          <echo>Verifying signed edugain2idem-metadata-sha1.</echo>
          <VFY.idem i="${output.dir}/${edugain2idem.metadata.signed.sha1}"/>
          <echo>...verified.</echo>
-
+-->
          <echo>Verifying signed edugain2idem-metadata-sha256.</echo>
          <VFY.idem i="${output.dir}/${edugain2idem.metadata.signed.sha256}"/>
          <echo>...verified.</echo>
 
          <echo>OK</echo>
--->
     </target>
 
     <target name="idem-signed-all" depends="get.sign.idem.keyPassword">
@@ -823,18 +793,19 @@
          <echo>...done.</echo>
 
          <echo>IDEM Test Metadata: Created.</echo>
-<!--
+
          <echo>Verify IDEM Test Metadata signature...</echo>
+<!--
          <echo>Verifying signed idem-test-metadata-sha1.</echo>
          <VFY.idem i="${output.dir}/${idem.test.metadata.signed.sha1}"/>
          <echo>...verified.</echo>
-         
+-->         
          <echo>Verifying signed idem-test-metadata-sha256.</echo>
          <VFY.idem i="${output.dir}/${idem.test.metadata.signed.sha256}"/>
          <echo>...verified.</echo>
 
          <echo>OK</echo>
--->
+
          <echo>Create IDEM Production metadata...</echo>
          <CHANNEL.do channel="it_idem" verb="idem-metadata"/>
          <echo>...done.</echo>
@@ -849,18 +820,19 @@
          <echo>...done.</echo>
 
          <echo>IDEM Production Metadata: Created.</echo>
-<!--
+
          <echo>Verify IDEM Test Metadata signature...</echo>
+<!--
          <echo>   Verifying signed idem-metadata-sha1...</echo>
          <VFY.idem i="${output.dir}/${idem.metadata.signed.sha1}"/>
          <echo>...verified.</echo>
-
+-->
          <echo>   Verifying signed idem-metadata-sha256...</echo>
          <VFY.idem i="${output.dir}/${idem.metadata.signed.sha256}"/>
          <echo>...verified.</echo>
 
          <echo>OK</echo>
--->
+
          <echo>Create IDEM idem2edugain metadata...</echo>
          <CHANNEL.do channel="it_idem" verb="idem2edugain-metadata"/>
          <echo>...done.</echo>
@@ -875,18 +847,19 @@
          <echo>...done.</echo>
 
          <echo>IDEM idem2edugain Metadata: Created.</echo>
-<!--
+
          <echo>Verify IDEM idem2edugain signature...</echo>
+<!--
          <echo>   Verifying signed idem2edugain-metadata-sha1.</echo>
          <VFY.idem i="${output.dir}/${idem2edugain.metadata.signed.sha1}"/>
          <echo>...verified.</echo>
-
+-->
          <echo>   Verifying signed idem2edugain-metadata-sha256.</echo>
          <VFY.idem i="${output.dir}/${idem2edugain.metadata.signed.sha256}"/>
          <echo>...verified.</echo>
 
          <echo>OK</echo>
--->
+
          <echo>Create IDEM edugain2idem metadata...</echo>
          <CHANNEL.do channel="it_idem" verb="edugain2idem-metadata"/>
          <echo>...done.</echo>
@@ -901,19 +874,18 @@
          <echo>...done.</echo>
 
          <echo>IDEM edugain2idem Metadata: Created.</echo>
-<!--
-         <echo>Verify IDEM edugain2idem signature...</echo>
 
+         <echo>Verify IDEM edugain2idem signature...</echo>
+<!--
          <echo>Verifying signed edugain2idem-metadata-sha1.</echo>
          <VFY.idem i="${output.dir}/${edugain2idem.metadata.signed.sha1}"/>
          <echo>...verified.</echo>
-
+-->
          <echo>Verifying signed edugain2idem-metadata-sha256.</echo>
          <VFY.idem i="${output.dir}/${edugain2idem.metadata.signed.sha256}"/>
          <echo>...verified.</echo>
 
          <echo>OK</echo>
--->
     </target>
 
     <!--
