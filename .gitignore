@@ -84,6 +84,9 @@ Thumbs.db
 
 # /mdx/it_idem/
 /mdx/it_idem/imported.xml
+/mdx/it_idem/md-in/idem-prod/put-idem-metadata-here-and-remove-this-file
+/mdx/it_idem/md-in/idem-test/put-idem-test-metadata-here-and-remove-this-file
+/mdx/it_idem/md-in/idem2edugain/put-idem2edugain-metadata-here-and-remove-this-file
 
 # /mdx/jp_gakunin/
 /mdx/jp_gakunin/imported.xml
